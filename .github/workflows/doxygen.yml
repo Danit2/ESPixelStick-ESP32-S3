@@ -1,0 +1,25 @@
+name: Doxygen
+on:
+  push:
+    branches:
+      - main
+jobs:
+  gendocs:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout ESPixelStick
+      - uses: actions/checkout@v4
+
+      - name: Build doxygen pages
+        uses: mattnotmitt/doxygen-action@v1
+        with:
+          additional-packages: font-fira-code-nerd
+          working-directory: ".doxygen"
+          doxyfile-path: "Doxyfile"
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .doxygen/doc/html
+          destination_dir: doxy
