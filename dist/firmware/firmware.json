@@ -1425,7 +1425,7 @@
             "binfiles": [
                 {
                     "name": "esp32s3/seeed_xiao_esp32s3-bootloader.bin",
-                    "offset": "0x00000"
+                    "offset": "0x01000"
                 },
                 {
                     "name": "esp32s3/seeed_xiao_esp32s3-partitions.bin",
