@@ -9,7 +9,7 @@ jobs:
         include:
           # Seeed Studio XIAO ESP32-S3
           - target: "seeed_xiao_esp32s3"
-            chip: "esp32"
+            chip: "esp32s3"
 
     runs-on: ubuntu-latest
     steps:
