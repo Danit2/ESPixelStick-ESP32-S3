@@ -162,14 +162,13 @@ c_FileMgr::~c_FileMgr ()
 ///< Start the module
 void c_FileMgr::Begin ()
 {
-    // DEBUG_START;
-
     do // once
     {
-        InitSdFileList ();
+        InitSdFileList();
 
         if (!LittleFS.begin(false)) {
-            logcon(String(F("LittleFS mount failed, trying to format...")));
+            logcon(F("LittleFS mount failed, trying to format..."));
+
             if (LittleFS.format()) {
                 logcon(F("LittleFS formatted successfully."));
                 if (!LittleFS.begin(false)) {
@@ -180,22 +179,15 @@ void c_FileMgr::Begin ()
             } else {
                 logcon(String(CN_stars) + F(" LittleFS format failed! ") + CN_stars);
             }
-        }
-#ifdef ARDUINO_ARCH_ESP32
-        logcon(String(F("Flash FS: used ")) + String(LittleFS.usedBytes()) + F(" of ") + String(LittleFS.totalBytes()));
-#endif
-        else
+        } 
+        else 
         {
 #ifdef ARDUINO_ARCH_ESP32
-            logcon(String(F("Flash file system initialized. Used = ")) + 
-                   String(LittleFS.usedBytes()) + 
-                   F(" out of ") + 
-                   String(LittleFS.totalBytes()));
+            logcon(String(F("Flash FS: used ")) + String(LittleFS.usedBytes()) + F(" of ") + String(LittleFS.totalBytes()));
 #else
             logcon(F("Flash file system initialized."));
-#endif // def ARDUINO_ARCH_ESP32
-
-            listDir(LittleFS, String("/"), 3);
+#endif
+            listDir(LittleFS, "/", 3);
         }
 
         SetSpiIoPins();
@@ -209,13 +201,12 @@ void c_FileMgr::Begin ()
             delete Unzipper;
             String Reason = F("Requesting reboot after unzipping files");
             RequestReboot(Reason, 1, true);
-        #endif // def SUPPORT_UNZIP
+        #endif
         }
 
     } while (false);
+}
 
-    // DEBUG_END;
-} // Begin
 
 //-----------------------------------------------------------------------------
 //    Cause the FTP operation to get re-established.
@@ -2256,4 +2247,5 @@ bool c_FileMgr::IsCompressed(String FileName)
 
 // create a global instance of the File Manager
 c_FileMgr FileMgr;
+
 
