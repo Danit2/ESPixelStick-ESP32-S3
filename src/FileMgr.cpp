@@ -168,28 +168,43 @@ void c_FileMgr::Begin ()
     {
         InitSdFileList ();
 
-        if (!LittleFS.begin ())
-        {
-            logcon ( String(CN_stars) + F (" Flash file system did not initialize correctly ") + CN_stars);
+        if (!LittleFS.begin(false)) {
+            logcon(String(F("LittleFS mount failed, trying to format...")));
+            if (LittleFS.format()) {
+                logcon(F("LittleFS formatted successfully."));
+                if (!LittleFS.begin(false)) {
+                    logcon(String(CN_stars) + F(" Failed to mount LittleFS even after format! ") + CN_stars);
+                } else {
+                    logcon(F("LittleFS mounted after format."));
+                }
+            } else {
+                logcon(String(CN_stars) + F(" LittleFS format failed! ") + CN_stars);
+            }
         }
+#ifdef ARDUINO_ARCH_ESP32
+        logcon(String(F("Flash FS: used ")) + String(LittleFS.usedBytes()) + F(" of ") + String(LittleFS.totalBytes()));
+#endif
         else
         {
 #ifdef ARDUINO_ARCH_ESP32
-            logcon (String (F ("Flash file system initialized. Used = ")) + String (LittleFS.usedBytes ()) + String (F (" out of ")) + String (LittleFS.totalBytes()) );
+            logcon(String(F("Flash file system initialized. Used = ")) + 
+                   String(LittleFS.usedBytes()) + 
+                   F(" out of ") + 
+                   String(LittleFS.totalBytes()));
 #else
-            logcon (String (F ("Flash file system initialized.")));
+            logcon(F("Flash file system initialized."));
 #endif // def ARDUINO_ARCH_ESP32
 
-            listDir (LittleFS, String ("/"), 3);
+            listDir(LittleFS, String("/"), 3);
         }
 
-        SetSpiIoPins ();
-        // DEBUG_V(String("FoundZipFile: ") + String(FoundZipFile))
-        if(FoundZipFile)
+        SetSpiIoPins();
+
+        if (FoundZipFile)
         {
             FeedWDT();
         #ifdef SUPPORT_UNZIP
-            UnzipFiles * Unzipper = new UnzipFiles();
+            UnzipFiles *Unzipper = new UnzipFiles();
             Unzipper->Run();
             delete Unzipper;
             String Reason = F("Requesting reboot after unzipping files");
@@ -200,7 +215,7 @@ void c_FileMgr::Begin ()
     } while (false);
 
     // DEBUG_END;
-} // begin
+} // Begin
 
 //-----------------------------------------------------------------------------
 //    Cause the FTP operation to get re-established.
@@ -2241,3 +2256,4 @@ bool c_FileMgr::IsCompressed(String FileName)
 
 // create a global instance of the File Manager
 c_FileMgr FileMgr;
+
