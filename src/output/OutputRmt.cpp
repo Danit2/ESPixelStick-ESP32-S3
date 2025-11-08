@@ -165,3 +165,35 @@ void c_OutputRmt::PauseOutput(bool pause)
     }
 }
 
+//----------------------------------------------------------------------------
+// Stellt Statusinformationen für Debug oder JSON-API bereit
+void c_OutputRmt::GetStatus(ArduinoJson::JsonObject& jsonStatus)
+{
+    // Minimale Implementierung für Kompatibilität
+    jsonStatus["RMT_Channel"] = static_cast<int>(OutputRmtConfig.RmtChannelId);
+    jsonStatus["DataPin"]     = static_cast<int>(OutputRmtConfig.DataPin);
+    jsonStatus["Initialized"] = HasBeenInitialized;
+    jsonStatus["Paused"]      = OutputIsPaused;
+}
+
+//----------------------------------------------------------------------------
+// Überprüft, ob Bit-Übersetzungstabelle gültig ist
+bool c_OutputRmt::ValidateBitXlatTable(const CitrdsArray_t *CitrdsArray)
+{
+    // einfache Plausibilitätsprüfung – reicht für LED-Protokolle
+    if (CitrdsArray == nullptr)
+        return false;
+
+    uint32_t count = 0;
+    const CitrdsArray_t* entry = CitrdsArray;
+
+    while (entry->Id != RMT_LIST_END)
+    {
+        count++;
+        entry++;
+    }
+
+    // Beispiel: Tabelle muss mindestens 2 Einträge enthalten
+    return (count >= 2);
+}
+
