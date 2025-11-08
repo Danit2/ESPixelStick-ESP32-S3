@@ -3,6 +3,10 @@
 #include "esp_log.h"
 #include "freertos/semphr.h"
 
+#include <vector>
+static std::vector<c_OutputRmt*> rmt_isr_ThisPtrs;
+
+
 static const char* TAG = "OutputRmt";
 
 struct S3RmtChannel {
@@ -128,7 +132,11 @@ void c_OutputRmt::Begin(OutputRmtConfig_t config, c_OutputCommon* outputDriver)
 {
     OutputRmtConfig = config;
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
-    s3_rmt_init_channel((rmt_channel_t)OutputRmtConfig.RmtChannelId, (gpio_num_t)OutputRmtConfig.Pin);
+    s3_rmt_init_channel(
+    (rmt_channel_t)OutputRmtConfig.RmtChannelId,
+    (gpio_num_t)OutputRmtConfig.DataPin
+);
+
 #else
     // alter Code für ESP32 bleibt hier unverändert
 #endif
