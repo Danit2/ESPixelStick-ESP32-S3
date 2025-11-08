@@ -17,6 +17,7 @@
 *
 */
 #include "ESPixelStick.h"
+#include "esp_idf_version.h"
 
 #include "output/OutputUart.hpp"
 extern "C"
@@ -874,11 +875,25 @@ bool c_OutputUart::RegisterUartIsrHandler()
         esp_intr_free(IsrHandle);
         IsrHandle = nullptr;
     }
-    ret = (ESP_OK == esp_intr_alloc((OutputUartConfig.UartId == UART_NUM_1) ? ETS_UART1_INTR_SOURCE : ETS_UART2_INTR_SOURCE,
-                                    UART_TXFIFO_EMPTY_INT_ENA | ESP_INTR_FLAG_IRAM,
-                                    uart_intr_handler,
-                                    this,
-                                    &IsrHandle));
+#if ESP_IDF_VERSION_MAJOR >= 5
+    // ESP-IDF 5.x (ESP32-S3 usw.)
+    ret = (ESP_OK == esp_intr_alloc(
+        (OutputUartConfig.UartId == UART_NUM_1) ? ETS_UART1_INUM : ETS_UART2_INUM,
+        ESP_INTR_FLAG_IRAM,
+        uart_isr_handler,
+        this,
+        &uart_isr_handle
+    ));
+#else
+    // ältere ESP32-IDF-Versionen
+    ret = (ESP_OK == esp_intr_alloc(
+        (OutputUartConfig.UartId == UART_NUM_1) ? ETS_UART1_INTR_SOURCE : ETS_UART2_INTR_SOURCE,
+        ESP_INTR_FLAG_IRAM,
+        uart_isr_handler,
+        this,
+        &uart_isr_handle
+    ));
+#endif
     // UART_EXIT_CRITICAL(&(uart_context[uart_num].spinlock));
 #endif
     // DEBUG_END;
