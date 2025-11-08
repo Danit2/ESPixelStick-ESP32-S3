@@ -1,0 +1,129 @@
+<fieldset id="effects">
+    <legend class="esps-legend" id="Title">Effect Configuration</legend>
+    <div class="form-group">
+        <label class="control-label col-sm-2" for="currenteffect">Effect</label>
+        <div class="col-sm-4">
+            <select class="form-control is-valid" id="currenteffect" title="Effect to generate"></select>
+        </div>
+        <label for="EffectColor" class="control-label col-sm-2">Color</label>
+        <div class="col-sm-4">
+            <input type="color" class="form-control is-valid" id="EffectColor" value="#000000" />
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="control-label col-sm-2" for="EffectSpeed">Speed</label>
+        <div class="col-sm-4">
+            <input type="number" class="form-control is-valid" id="EffectSpeed" step="1" min="1" max="10" value="0"
+                required title="Rate at which effect runs">
+        </div>
+        <label class="control-label col-sm-2" for="EffectBrightness">Brightness (%)</label>
+        <div class="col-sm-4">
+            <input type="number" class="form-control is-valid" id="EffectBrightness" step="1" min="1" max="100"
+                value="0" required title="Effect Intensity">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <div class="row">
+            <div class="col-sm-offset-2 col-sm-2" id="d_EffectReverse">
+                <div class="checkbox"><label><input type="checkbox" id="EffectReverse" class="reverse"
+                            name="t_reverse">Reverse pattern</label></div>
+            </div>
+            <div class="col-sm-8" id="d_EffectMirror">
+                <div class="checkbox"><label><input type="checkbox" id="EffectMirror" class="mirror"
+                            name="t_mirror">Mirror pattern</label></div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-offset-2 col-sm-2" id="d_EffectAllLeds">
+                <div class="checkbox"><label><input type="checkbox" id="EffectAllLeds" class="allleds"
+                            name="t_allleds">All leds same </label></div>
+            </div>
+            <div class="col-sm-8" id="d_EffectWhiteChannel">
+                <div class="checkbox"><label><input type="checkbox" id="EffectWhiteChannel" class="whitechannel"
+                            name="t_whitechannel">Add White Channel Data</label></div>
+            </div>
+        </div>
+
+        <div>
+            <label class="control-label col-sm-offset-0" for="EffectFlashTable">Effect Flash Settings</label>
+            <table class="table col-sm-offset-1 col-sm-1" id="EffectFlashTable">
+                <thead>
+                    <tr>
+                        <th>Enable</th>
+                        <th>Min Intensity %</th>
+                        <th>Max Intensity %</th>
+                        <th>Min Delay (ms)</th>
+                        <th>Max Delay (ms)</th>
+                        <th>Min Duration (ms)</th>
+                        <th>Max Duration (ms)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <td><input type="checkbox" id="FlashEnable"></td>
+                    <td><input type="number" class="form-control is-valid" id="FlashMinInt"   step="1" min="20"  max="100"    value=50></td>';
+                    <td><input type="number" class="form-control is-valid" id="FlashMaxInt"   step="1" min="20"  max="100"    value=100></td>';
+                    <td><input type="number" class="form-control is-valid" id="FlashMinDelay" step="1" min="100" max="100000" value=100></td>';
+                    <td><input type="number" class="form-control is-valid" id="FlashMaxDelay" step="1" min="100" max="100000" value=10000></td>';
+                    <td><input type="number" class="form-control is-valid" id="FlashMinDur"   step="1" min="10"  max="1000"   value=100></td>';
+                    <td><input type="number" class="form-control is-valid" id="FlashMaxDur"   step="1" min="10"  max="1000"   value=1000></td>';
+                </tbody>
+            </table>
+        </div>
+
+        <div class="form-group hidden" id="TransitionsConfig">
+            <label class="control-label col-sm-2" for="TransCount">Steps Between Colors</label>
+            <div class="col-sm-4">
+                <input type="number" class="form-control is-valid" id="TransCount" step="1" min="1" max="10000"
+                    value="0" required title="Steps between Colors">
+            </div>
+            <label class="control-label col-sm-2" for="TransDelay">Milli Seconds to stay at color</label>
+            <div class="col-sm-4">
+                <input type="number" class="form-control is-valid" id="TransDelay" step="1" min="1" max="10000"
+                    value="0" required title="Milli Seconds to stay at color.">
+            </div>
+            <label class="control-label col-sm-2" for="TransitionColorTable">Transitions</label>
+            <div class="form-group " style="height:200px; overflow:auto;">
+                <div class="col-sm-offset-0 col-sm-2" id="d_transition">
+                    <table class="table" id="TransitionColorTable">
+                        <thead>
+                            <tr>
+                                <th id="transitionId_hr">Row</th>
+                                <th id="TransitionColor_hr">Color</th>
+                                <th id="TransitionDelete_hr">Delete</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr></tr>
+                        </tbody>
+                    </table>
+                    <button type="Button" class="btn btn-primary" id="AddTransitionBtn">Add Transition</button>;
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group hidden" id="MarqueeConfig">
+            <label class="control-label col-sm-2" for="MarqueeGroupTable">Marquee Groups</label>
+            <div class="col-sm-offset-0 col-sm-8 form-group" style="height:200px; overflow:auto;" id="d_MarqueeGroup">
+                <table class="table" id="MarqueeGroupTable">
+                    <thead>
+                        <tr>
+                            <th id="MarqueeGroupId_hr">Row</th>
+                            <th id="MarqueeGroupIntensity_hr">Max %</th>
+                            <th id="MarqueeGroupIntensityEnd_hr">Min %</th>
+                            <th id="MarqueeGroupCount_hr">Num Pixels</th>
+                            <th id="MarqueeGroupColor_hr">Color</th>
+                            <th id="MarqueeGroupDelete_hr">Delete</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr></tr>
+                    </tbody>
+                </table>
+                <button type="Button" class="btn btn-primary" id="AddMarqueeGroupBtn">Add Marquee Group</button>;
+            </div>
+        </div>
+    </div>
+</fieldset>
