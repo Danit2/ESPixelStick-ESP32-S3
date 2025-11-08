@@ -1,5 +1,5 @@
 #include "output/OutputRmt.hpp"
-#include "driver/rmt_tx.h"
+#include "driver/rmt.h"
 #include "esp_log.h"
 #include "freertos/semphr.h"
 #include <vector>
@@ -7,6 +7,7 @@
 static const char* TAG = "OutputRmtS3";
 
 c_OutputRmt::c_OutputRmt() = default;
+
 c_OutputRmt::~c_OutputRmt()
 {
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -48,7 +49,6 @@ bool c_OutputRmt::StartNewFrame()
 {
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
     if (!HasBeenInitialized) return false;
-    // Dummy pulse send to keep driver active
     rmt_item32_t dummy = {{{10, 1, 10, 0}}};
     rmt_write_items((rmt_channel_t)OutputRmtConfig.RmtChannelId, &dummy, 1, true);
 #endif
@@ -74,11 +74,9 @@ void c_OutputRmt::PauseOutput(bool pause)
 
 void c_OutputRmt::ISR_Handler(uint32_t isrFlags)
 {
-    // Not used on S3 — handled by driver
-    (void)isrFlags;
+    (void)isrFlags; // not used
 }
 
-// Statusreport für JSON / Debug
 void c_OutputRmt::GetStatus(ArduinoJson::JsonObject& jsonStatus)
 {
     jsonStatus["RMT_Channel"] = static_cast<int>(OutputRmtConfig.RmtChannelId);
@@ -87,7 +85,6 @@ void c_OutputRmt::GetStatus(ArduinoJson::JsonObject& jsonStatus)
     jsonStatus["Paused"]      = OutputIsPaused;
 }
 
-// Plausibilitätscheck für Bitübersetzungstabellen
 bool c_OutputRmt::ValidateBitXlatTable(const CitrdsArray_t* CitrdsArray)
 {
     if (!CitrdsArray) return false;
