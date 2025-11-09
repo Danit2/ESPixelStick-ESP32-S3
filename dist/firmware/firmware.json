@@ -10,7 +10,7 @@
             "esptool": {
                 "baudrate": "115200",
                 "options": "--before default_reset --after hard_reset",
-                "flashcmd": "write_flash -z"
+                "flashcmd": "-z"
             },
             "binfiles": [
                 {
