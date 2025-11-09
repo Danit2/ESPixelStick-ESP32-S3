@@ -5,7 +5,7 @@
         {
             "name": "Seeed Studio XIAO ESP32-S3",
             "description": "ESP32-S3 mini Controller",
-            "chip": "esp32",
+            "chip": "esp32s3",
             "appbin": "esp32s3/seeed_xiao_esp32s3-app.bin",
             "esptool": {
                 "baudrate": "115200",
@@ -33,8 +33,8 @@
             "filesystem": {
                 "page": "256",
                 "block": "4096",
-                "size": "0x50000",
-                "offset": "0x3B0000"
+                "size": "0x4d0000",
+                "offset": "0x330000"
             }
         }
         
