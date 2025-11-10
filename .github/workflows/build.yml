@@ -52,6 +52,14 @@ jobs:
 
       # Build and move / rename firmware files
       # Make sure to update bootloader and boot_app0.bin location when the ESP32 core updates
+      
+      - name: Clean PlatformIO cache
+        run: |
+            rm -rf ~/.platformio/packages/framework-arduinoespressif32*
+            rm -rf ~/.platformio/packages/framework-arduinoespressif32-libs*
+            rm -rf ~/.platformio/platforms/espressif32
+            rm -rf .pio
+
       - name: Compile for ${{ matrix.target }}
         env:
           chip: ${{ matrix.chip }}
