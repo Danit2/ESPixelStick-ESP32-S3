@@ -176,6 +176,12 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
 
         // NOTE: we are NOT using direct register-based ISR anymore. The code will start
         // asynchronous writes and use a watcher task to wait for completion and notify.
+		
+		// --- Force RMT to use APB 80 MHz clock for finer WS2811 timing
+		#if defined(SOC_RMT_SUPPORT_REF_TICK)
+			ESP_ERROR_CHECK(rmt_set_source_clk((rmt_channel_t)OutputRmtConfig.RmtChannelId, RMT_BASECLK_APB));
+		#endif
+
 
         // reset the internal indices & buffer counters
         ISR_ResetRmtBlockPointers ();
