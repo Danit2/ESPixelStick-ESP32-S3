@@ -21,14 +21,14 @@
 
 #include "output/OutputWS2811Rmt.hpp"
 
-// The adjustments compensate for rounding errors in the calculations
-#define RMT_TickLengthNS 25.0f  // Force 40MHz base clock (25ns per tick)
+// --- tuned for 40 MHz RMT clock (25 ns per tick) ---
+#define RMT_TickLengthNS 25.0f  // 40 MHz fixed clock on ESP32-S3
 
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH uint16_t((WS2811_PIXEL_NS_BIT_0_HIGH / RMT_TickLengthNS) + 0.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW  uint16_t((WS2811_PIXEL_NS_BIT_0_LOW  / RMT_TickLengthNS) + 0.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH uint16_t((WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS) - 1.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW  uint16_t((WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 1.0)
-#define WS2811_PIXEL_RMT_TICKS_IDLE       uint16_t((WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 1.0)
+#define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH 14   // 14 × 25ns = 350ns
+#define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW  32   // 32 × 25ns = 800ns
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH 28   // 28 × 25ns = 700ns
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW  24   // 24 × 25ns = 600ns
+#define WS2811_PIXEL_RMT_TICKS_IDLE       560  // 560 × 25ns = 14µs  (Pause zwischen Frames)
 
 static const c_OutputRmt::ConvertIntensityToRmtDataStreamEntry_t ConvertIntensityToRmtDataStream[] =
 {
