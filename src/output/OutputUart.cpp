@@ -861,15 +861,14 @@ bool c_OutputUart::RegisterUartIsrHandler()
 {
     bool ret = false;
 
-    // Für ESP32-S3 gibt es nur einen UART-Interrupt-Source-Wert
-    const int intr_source = ETS_UART0_INTR_SOURCE;
+    // ESP32-S3 verwendet ETS_UART0_INUM statt ETS_UARTx_INTR_SOURCE
+    const int intr_source = ETS_UART0_INUM;
 
-    // Installiere den Interrupt-Handler
     ret = (ESP_OK == esp_intr_alloc(intr_source,
                                     ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_SHARED,
-                                    uart_intr_handler,   // Name der existierenden Handlerfunktion
+                                    uart_intr_handler,   // existierender Handler
                                     this,
-                                    &IsrHandle));        // Handle-Mitglied deiner Klasse
+                                    &IsrHandle));        // Handle deiner Klasse
     return ret;
 
 } // RegisterUartIsrHandler
