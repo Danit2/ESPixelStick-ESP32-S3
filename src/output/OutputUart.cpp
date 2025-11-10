@@ -874,11 +874,11 @@ bool c_OutputUart::RegisterUartIsrHandler()
         esp_intr_free(IsrHandle);
         IsrHandle = nullptr;
     }
-    ret = (ESP_OK == esp_intr_alloc((OutputUartConfig.UartId == UART_NUM_1) ? ETS_UART1_INTR_SOURCE : ETS_UART2_INTR_SOURCE,
-                                    UART_TXFIFO_EMPTY_INT_ENA | ESP_INTR_FLAG_IRAM,
-                                    uart_intr_handler,
-                                    this,
-                                    &IsrHandle));
+    ret = (ESP_OK == esp_intr_alloc(UART_INTR_SOURCE,
+									ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_SHARED,
+									uart_isr_handler,
+									this,
+									&UartIsrHandle));
     // UART_EXIT_CRITICAL(&(uart_context[uart_num].spinlock));
 #endif
     // DEBUG_END;
