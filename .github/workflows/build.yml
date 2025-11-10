@@ -26,10 +26,10 @@ jobs:
         run: |
           echo "${GITHUB_REF#refs/*/v}" > firmware/VERSION
           
-        - name: Clean PlatformIO build and packages
-          run: |
-            rm -rf ~/.platformio
-            rm -rf .pio
+      - name: Clean PlatformIO build and packages
+        run: |
+          rm -rf ~/.platformio
+          rm -rf .pio
 
 
       # - name: Cache pip
