@@ -109,7 +109,7 @@ c_OutputRmt::~c_OutputRmt ()
 
         int ch = OutputRmtConfig.RmtChannelId;
         // disable channel and driver for that channel
-        rmt_set_gpio_in_out((rmt_channel_t)ch, RMT_MODE_TX, (gpio_num_t)OutputRmtConfig.DataPin); // best effort no-op alternative
+        rmt_set_gpio((rmt_channel_t)ch, (gpio_num_t)OutputRmtConfig.DataPin);
         rmt_driver_uninstall((rmt_channel_t)ch);
 
         rmt_isr_ThisPtrs[OutputRmtConfig.RmtChannelId] = (c_OutputRmt*)nullptr;
@@ -158,7 +158,7 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
         RmtConfig.channel = (rmt_channel_t)OutputRmtConfig.RmtChannelId;
         RmtConfig.gpio_num = (gpio_num_t)OutputRmtConfig.DataPin;
         RmtConfig.clk_div = RMT_Clock_Divisor; // keep original divisor behavior
-        RmtConfig.mem_block_num = rmt_mem_block_t::RMT_MEM_64;
+        RmtConfig.mem_block_num = 1;
         RmtConfig.tx_config.carrier_freq_hz = 10; // avoid zero due to driver bug
         RmtConfig.tx_config.carrier_level = rmt_carrier_level_t::RMT_CARRIER_LEVEL_LOW;
         RmtConfig.tx_config.carrier_duty_percent = 50;
@@ -172,7 +172,7 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
 
         // install driver for that channel (channel mask uses 1<<channel)
         uint32_t ch_mask = (1u << OutputRmtConfig.RmtChannelId);
-        ESP_ERROR_CHECK(rmt_driver_install(ch_mask, 0, NULL));
+        ESP_ERROR_CHECK(rmt_driver_install((rmt_channel_t)OutputRmtConfig.RmtChannelId, 0, 0));
 
         // NOTE: we are NOT using direct register-based ISR anymore. The code will start
         // asynchronous writes and use a watcher task to wait for completion and notify.
