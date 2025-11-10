@@ -109,7 +109,7 @@ c_OutputRmt::~c_OutputRmt ()
 
         int ch = OutputRmtConfig.RmtChannelId;
         // disable channel and driver for that channel
-        rmt_set_gpio((rmt_channel_t)ch, (gpio_num_t)OutputRmtConfig.DataPin);
+        rmt_set_gpio((rmt_channel_t)ch, RMT_MODE_TX, (gpio_num_t)OutputRmtConfig.DataPin, false);
         rmt_driver_uninstall((rmt_channel_t)ch);
 
         rmt_isr_ThisPtrs[OutputRmtConfig.RmtChannelId] = (c_OutputRmt*)nullptr;
