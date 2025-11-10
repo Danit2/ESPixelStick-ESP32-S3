@@ -859,31 +859,19 @@ void c_OutputUart::PauseOutput(bool PauseOutput)
 //-----------------------------------------------------------------------------
 bool c_OutputUart::RegisterUartIsrHandler()
 {
-    // DEBUG_START;
+    bool ret = false;
 
-    bool ret = true;
-    DisableUartInterrupts();
+    // Für ESP32-S3 gibt es nur einen UART-Interrupt-Source-Wert
+    const int intr_source = ETS_UART0_INTR_SOURCE;
 
-#ifdef ARDUINO_ARCH_ESP8266
-    // ETS_UART_INTR_DETACH(uart_intr_handler);
-    ETS_UART_INTR_ATTACH(uart_intr_handler, this);
-#else
-    // UART_ENTER_CRITICAL(&(uart_context[uart_num].spinlock));
-    if (IsrHandle)
-    {
-        esp_intr_free(IsrHandle);
-        IsrHandle = nullptr;
-    }
-    ret = (ESP_OK == esp_intr_alloc(UART_INTR_SOURCE,
-									ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_SHARED,
-									uart_isr_handler,
-									this,
-									&UartIsrHandle));
-    // UART_EXIT_CRITICAL(&(uart_context[uart_num].spinlock));
-#endif
-    // DEBUG_END;
-
+    // Installiere den Interrupt-Handler
+    ret = (ESP_OK == esp_intr_alloc(intr_source,
+                                    ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_SHARED,
+                                    uart_intr_handler,   // Name der existierenden Handlerfunktion
+                                    this,
+                                    &IsrHandle));        // Handle-Mitglied deiner Klasse
     return ret;
+
 } // RegisterUartIsrHandler
 
 //----------------------------------------------------------------------------
