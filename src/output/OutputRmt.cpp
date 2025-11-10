@@ -1,52 +1,54 @@
 #include "output/OutputRmt.hpp"
-
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
-// new RMT TX API for IDF v5+
-#include "driver/rmt_tx.h"
-#include "driver/rmt.h"
-#else
-// keep legacy include for other chips / older IDF (if you still build for esp32)
-#include "driver/rmt.h"
-#endif
-
+#include "esp_idf_version.h"
 #include "esp_log.h"
 #include "freertos/semphr.h"
 
-static const char* TAG = "OutputRmtS3";
+static const char* TAG = "OutputRmt";
 
-c_OutputRmt::c_OutputRmt() :
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
-    txChannel(nullptr),
+// Prüfen, ob wir unter ESP-IDF >=5 laufen (neue RMT-API verfügbar)
+#if ESP_IDF_VERSION_MAJOR >= 5
+  extern "C" {
+    // Arduino exportiert diese Header nicht direkt, deshalb der Pfad über esp_private
+    #include "esp_private/esp_clk.h"
+    #include "driver/rmt_tx.h"
+    #include "driver/rmt_encoder.h"
+  }
+  #define HAS_RMT_V2_API 1
+#else
+  #include "driver/rmt.h"
+  #define HAS_RMT_V2_API 0
 #endif
-    HasBeenInitialized(false),
-    OutputIsPaused(false),
-    pParent(nullptr)
+
+
+c_OutputRmt::c_OutputRmt()
+    :
+#if HAS_RMT_V2_API
+      txChannel(nullptr),
+      copy_encoder(nullptr),
+#endif
+      HasBeenInitialized(false),
+      OutputIsPaused(false),
+      pParent(nullptr)
 {
 }
 
 c_OutputRmt::~c_OutputRmt()
 {
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
-    if (HasBeenInitialized) {
-        if (txChannel) {
-            // delete the new-style channel (rmt_del_channel) — releases driver + hardware resources
-            esp_err_t err = rmt_del_channel(txChannel);
-            if (err == ESP_OK) {
-                ESP_LOGI(TAG, "RMT tx channel deleted");
-            } else {
-                ESP_LOGW(TAG, "rmt_del_channel failed (%d)", err);
-            }
-            txChannel = nullptr;
-        }
+#if HAS_RMT_V2_API
+    if (HasBeenInitialized && txChannel) {
+        esp_err_t err = rmt_del_channel(txChannel);
+        if (err == ESP_OK)
+            ESP_LOGI(TAG, "RMT channel deleted");
+        else
+            ESP_LOGW(TAG, "rmt_del_channel failed: %d", err);
     }
 #else
-    if (HasBeenInitialized)
-    {
+    if (HasBeenInitialized) {
         esp_err_t err = rmt_driver_uninstall(OutputRmtConfig.RmtChannelId);
         if (err == ESP_OK)
-            ESP_LOGI(TAG, "RMT channel %d deinitialized", OutputRmtConfig.RmtChannelId);
+            ESP_LOGI(TAG, "Legacy RMT channel %d deinitialized", OutputRmtConfig.RmtChannelId);
         else
-            ESP_LOGW(TAG, "rmt_driver_uninstall failed (%d)", err);
+            ESP_LOGW(TAG, "rmt_driver_uninstall failed: %d", err);
     }
 #endif
 }
@@ -58,45 +60,35 @@ void c_OutputRmt::Begin(OutputRmtConfig_t config, c_OutputCommon* outputDriver)
     HasBeenInitialized = false;
     OutputIsPaused = false;
 
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
-    ESP_LOGI(TAG, "Init RMT TX channel (new API) requested for GPIO %d (logical id %d)", config.DataPin, config.RmtChannelId);
+#if HAS_RMT_V2_API
+    ESP_LOGI(TAG, "Init RMT (new API) GPIO %d", config.DataPin);
 
-    // Configure new-style TX channel
     rmt_tx_channel_config_t tx_cfg = {
-        .clk_src = RMT_CLK_SRC_DEFAULT,            // use default clock source
-        .gpio_num = (gpio_num_t)config.DataPin,    // output pin
-        // mem_block_symbols chooses how many RMT symbols fit in the channel memory. Adjust if needed.
+        .gpio_num = (gpio_num_t)config.DataPin,
+        .clk_src = RMT_CLK_SRC_DEFAULT,
+        .resolution_hz = 10 * 1000 * 1000, // 10 MHz
         .mem_block_symbols = 64,
-        // transmission queue depth, higher => more outstanding transmits queued
         .trans_queue_depth = 4,
     };
 
-    // allocate and create the TX channel handle
     esp_err_t err = rmt_new_tx_channel(&tx_cfg, &txChannel);
-    if (err != ESP_OK || txChannel == nullptr) {
+    if (err != ESP_OK || !txChannel) {
         ESP_LOGE(TAG, "rmt_new_tx_channel failed: %d", err);
         return;
     }
 
-    // Create a COPY encoder so we can directly feed rmt_item32_t symbols later.
-    // The copy encoder simply copies provided RMT symbols into driver's buffer.
-    err = rmt_new_copy_encoder(&copy_encoder, 0); // second arg reserved flags = 0
+    err = rmt_new_copy_encoder(&copy_encoder, NULL);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "rmt_new_copy_encoder failed: %d (continuing, but transmit of raw items may not work)", err);
-        // not fatal here — depending on IDF this might be optional; keep channel but warn.
-    } else {
-        // attach the encoder to tx channel (so transmit functions can use it)
-        err = rmt_tx_register_encoder(txChannel, copy_encoder);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "rmt_tx_register_encoder failed: %d", err);
-        }
+        ESP_LOGE(TAG, "rmt_new_copy_encoder failed: %d", err);
+        return;
     }
 
+    ESP_ERROR_CHECK(rmt_enable(txChannel));
     HasBeenInitialized = true;
-    ESP_LOGI(TAG, "RMT TX channel initialized (new API)");
+    ESP_LOGI(TAG, "RMT v2 channel initialized on GPIO %d", config.DataPin);
+
 #else
     ESP_LOGI(TAG, "Init legacy RMT channel %d on GPIO %d", config.RmtChannelId, config.DataPin);
-
     rmt_config_t rmt_cfg = {};
     rmt_cfg.rmt_mode = RMT_MODE_TX;
     rmt_cfg.channel = (rmt_channel_t)config.RmtChannelId;
@@ -106,52 +98,40 @@ void c_OutputRmt::Begin(OutputRmtConfig_t config, c_OutputCommon* outputDriver)
     rmt_cfg.tx_config.carrier_en = false;
     rmt_cfg.tx_config.idle_output_en = true;
     rmt_cfg.tx_config.idle_level = RMT_IDLE_LEVEL_LOW;
-    rmt_cfg.clk_div = 2; // 40 MHz base clock
+    rmt_cfg.clk_div = 2;
 
     esp_err_t err = rmt_config(&rmt_cfg);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "rmt_config failed: %d", err);
         return;
     }
-
     err = rmt_driver_install(rmt_cfg.channel, 0, 0);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "rmt_driver_install failed: %d", err);
         return;
     }
-
     HasBeenInitialized = true;
-    ESP_LOGI(TAG, "Legacy RMT channel %d initialized successfully", config.RmtChannelId);
 #endif
 }
 
 bool c_OutputRmt::StartNewFrame()
 {
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
-    if (!HasBeenInitialized || txChannel == nullptr) {
-        ESP_LOGW(TAG, "StartNewFrame called before init (new API)");
+#if HAS_RMT_V2_API
+    if (!HasBeenInitialized || !txChannel) {
+        ESP_LOGW(TAG, "StartNewFrame before init");
         return false;
     }
-
-    // In legacy code you sent a single dummy rmt_item32_t via rmt_write_items.
-    // With the new API we must use rmt_transmit (or enqueue a transmit using the registered encoder).
-    // We'll create a single copy of an rmt_item32_t and transmit it via rmt_transmit.
-    rmt_item32_t dummy = {{{10, 1, 10, 0}}};
-
-    // NOTE: rmt_transmit / rmt_tx_* signatures differ across IDF minor versions.
-    // The common pattern (IDF v5.x) is rmt_transmit(txChannel, &dummy, 1, timeout_ticks);
-    esp_err_t err = rmt_transmit(txChannel, (rmt_symbol_word_t*)&dummy, 1, 0); // timeout 0 => non-blocking
+    rmt_item32_t symbol = {{{10, 1, 10, 0}}};
+    esp_err_t err = rmt_transmit(txChannel, copy_encoder, &symbol, sizeof(symbol), NULL);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "rmt_transmit failed: %d", err);
         return false;
     }
+    rmt_tx_wait_all_done(txChannel, -1);
 #else
-    if (!HasBeenInitialized) {
-        ESP_LOGW(TAG, "StartNewFrame called before init");
-        return false;
-    }
-    rmt_item32_t dummy = {{{10, 1, 10, 0}}};
-    esp_err_t err = rmt_write_items((rmt_channel_t)OutputRmtConfig.RmtChannelId, &dummy, 1, true);
+    if (!HasBeenInitialized) return false;
+    rmt_item32_t symbol = {{{10, 1, 10, 0}}};
+    esp_err_t err = rmt_write_items((rmt_channel_t)OutputRmtConfig.RmtChannelId, &symbol, 1, true);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "rmt_write_items failed: %d", err);
         return false;
@@ -162,38 +142,20 @@ bool c_OutputRmt::StartNewFrame()
 
 void c_OutputRmt::PauseOutput(bool pause)
 {
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
-    if (!HasBeenInitialized || txChannel == nullptr)
-        return;
-
-    esp_err_t err;
-    if (pause) {
-        // stop transmission
-        err = rmt_tx_disable(txChannel);
-        OutputIsPaused = true;
-    } else {
-        // enable transmission again
-        err = rmt_tx_enable(txChannel);
-        OutputIsPaused = false;
-    }
-
+#if HAS_RMT_V2_API
+    if (!HasBeenInitialized || !txChannel) return;
+    esp_err_t err = pause ? rmt_tx_disable(txChannel) : rmt_tx_enable(txChannel);
     if (err != ESP_OK)
-        ESP_LOGW(TAG, "PauseOutput (new API): rmt_tx_* failed (%d)", err);
+        ESP_LOGW(TAG, "PauseOutput failed: %d", err);
+    OutputIsPaused = pause;
 #else
-    if (!HasBeenInitialized)
-        return;
-
-    esp_err_t err;
-    if (pause) {
-        err = rmt_tx_stop((rmt_channel_t)OutputRmtConfig.RmtChannelId);
-        OutputIsPaused = true;
-    } else {
-        err = rmt_tx_start((rmt_channel_t)OutputRmtConfig.RmtChannelId, true);
-        OutputIsPaused = false;
-    }
-
+    if (!HasBeenInitialized) return;
+    esp_err_t err = pause
+        ? rmt_tx_stop((rmt_channel_t)OutputRmtConfig.RmtChannelId)
+        : rmt_tx_start((rmt_channel_t)OutputRmtConfig.RmtChannelId, true);
     if (err != ESP_OK)
-        ESP_LOGW(TAG, "PauseOutput: rmt_tx_* failed (%d)", err);
+        ESP_LOGW(TAG, "PauseOutput failed: %d", err);
+    OutputIsPaused = pause;
 #endif
 }
 
@@ -204,22 +166,15 @@ void c_OutputRmt::ISR_Handler(uint32_t isrFlags)
 
 void c_OutputRmt::GetStatus(ArduinoJson::JsonObject& jsonStatus)
 {
-    jsonStatus["RMT_Channel"] = (int)OutputRmtConfig.RmtChannelId;
-    jsonStatus["GPIO"]        = (int)OutputRmtConfig.DataPin;
-    jsonStatus["Init"]        = HasBeenInitialized;
-    jsonStatus["Paused"]      = OutputIsPaused;
+    jsonStatus["GPIO"]   = (int)OutputRmtConfig.DataPin;
+    jsonStatus["Init"]   = HasBeenInitialized;
+    jsonStatus["Paused"] = OutputIsPaused;
 }
 
-bool c_OutputRmt::ValidateBitXlatTable(const CitrdsArray_t* CitrdsArray)
+bool c_OutputRmt::ValidateBitXlatTable(const CitrdsArray_t* arr)
 {
-    if (!CitrdsArray)
-        return false;
-
+    if (!arr) return false;
     uint32_t count = 0;
-    const CitrdsArray_t* entry = CitrdsArray;
-    while (entry->Id != RMT_LIST_END) {
-        ++count;
-        ++entry;
-    }
+    while (arr->Id != RMT_LIST_END) { ++count; ++arr; }
     return (count >= 2);
 }
