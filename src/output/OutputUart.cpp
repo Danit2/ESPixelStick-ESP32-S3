@@ -17,7 +17,6 @@
 *
 */
 #include "ESPixelStick.h"
-#include "esp_idf_version.h"
 
 #include "output/OutputUart.hpp"
 extern "C"
@@ -857,41 +856,35 @@ void c_OutputUart::PauseOutput(bool PauseOutput)
     // DEBUG_END;
 } // PauseOutput
 
-//----------------------------------------------------------------------------
-// Anpassung für ESP-IDF 5.x (ESP32-S3, ESP32-C3 usw.)
+//-----------------------------------------------------------------------------
 bool c_OutputUart::RegisterUartIsrHandler()
 {
+    // DEBUG_START;
+
     bool ret = true;
     DisableUartInterrupts();
 
 #ifdef ARDUINO_ARCH_ESP8266
+    // ETS_UART_INTR_DETACH(uart_intr_handler);
     ETS_UART_INTR_ATTACH(uart_intr_handler, this);
-
-#elif defined(ARDUINO_ARCH_ESP32)
+#else
+    // UART_ENTER_CRITICAL(&(uart_context[uart_num].spinlock));
     if (IsrHandle)
     {
         esp_intr_free(IsrHandle);
         IsrHandle = nullptr;
     }
-
-    // Neue API für ESP-IDF 5.x
-    ret = (ESP_OK == uart_isr_register(
-                        OutputUartConfig.UartId,
-                        uart_intr_handler,
-                        this,
-                        ESP_INTR_FLAG_IRAM,    // ISR läuft im IRAM-Kontext
-                        &IsrHandle));
-
-    // Aktivieren der FIFO-Interrupts
-    if (ret)
-    {
-        uart_enable_tx_intr(OutputUartConfig.UartId, true, OutputUartConfig.FiFoTriggerLevel);
-    }
+    ret = (ESP_OK == esp_intr_alloc((OutputUartConfig.UartId == UART_NUM_1) ? ETS_UART1_INTR_SOURCE : ETS_UART2_INTR_SOURCE,
+                                    UART_TXFIFO_EMPTY_INT_ENA | ESP_INTR_FLAG_IRAM,
+                                    uart_intr_handler,
+                                    this,
+                                    &IsrHandle));
+    // UART_EXIT_CRITICAL(&(uart_context[uart_num].spinlock));
 #endif
+    // DEBUG_END;
 
     return ret;
 } // RegisterUartIsrHandler
-
 
 //----------------------------------------------------------------------------
 bool c_OutputUart::SetConfig(JsonObject &jsonConfig)

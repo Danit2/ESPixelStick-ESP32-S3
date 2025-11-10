@@ -136,6 +136,8 @@ typedef enum
 #   include "platforms/GPIO_Defs_ESP32_DevkitC.hpp"
 #elif defined (BOARD_ESP01S)
 #   include "platforms/GPIO_Defs_ESP8266_ESP01S.hpp"
+#elif defined (BOARD_ESP32_S)
+#   include "platforms/GPIO_Defs_ESP32_S.hpp"
 #elif defined (BOARD_ESPS_V3)
 #   include "platforms/GPIO_Defs_ESP8266_ESPS_V3.hpp"
 #elif defined (BOARD_ESPS_ESP3DEUXQUATRO_DMX)
@@ -150,8 +152,6 @@ typedef enum
 #   include "platforms/GPIO_Defs_ESP32_kr_lights_msm.hpp"
 #elif defined (BOARD_ESP32_BREAKDANCEV2)
 #   include "platforms/GPIO_Defs_ESP32_BreakDanceV2.hpp"
-#elif defined (BOARD_SEEED_XIAO_ESP32S3)
-#   include "platforms/GPIO_Defs_ESP32_XIAO_S3.hpp"
 #elif defined (BOARD_ESP8266_D1MINI_LOLIN_SD)
 #   include "platforms/GPIO_Defs_ESP8266_D1_mini_lolinsd.hpp"
 #elif defined (ARDUINO_ARCH_ESP32)
