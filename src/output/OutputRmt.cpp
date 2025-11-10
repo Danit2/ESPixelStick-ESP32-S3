@@ -5,46 +5,74 @@
 * Copyright (c) 2015, 2024 Shelby Merrick
 * http://www.forkineye.com
 *
+* Adapted to use IDF4-style RMT function API (driver/rmt.h) so it compiles with
+* platform-espressif32 @ 6.12.0 and runs on ESP32-S3 without direct register access.
 */
 #include "ESPixelStick.h"
 #ifdef ARDUINO_ARCH_ESP32
 #include "output/OutputRmt.hpp"
-
-// New RMT API headers (IDF v5+)
-#include <driver/rmt_tx.h>
-#include <driver/rmt_encoder.h>
-
+#include <driver/rmt.h>
 #include <vector>
+#include <cstdlib>
 
-// forward declaration for the isr handler (unused for S3 copy-encoder flow)
-static void IRAM_ATTR   rmt_intr_handler (void* param) { (void)param; /* no-op for S3 path */ }
+// forward declaration for the isr handler (not used for register operations anymore)
+static void IRAM_ATTR   rmt_intr_handler (void* param) { (void)param; }
 
-// RMT handles for new API
-static rmt_channel_handle_t g_rmt_chan_handles[MAX_NUM_RMT_CHANNELS] = { nullptr };
-static rmt_encoder_handle_t g_rmt_encoders[MAX_NUM_RMT_CHANNELS] = { nullptr };
-
-// task related unchanged
-static TaskHandle_t SendFrameTaskHandle = NULL;
-static BaseType_t xHigherPriorityTaskWoken = pdTRUE;
-static uint32_t FrameCompletes = 0;
-static uint32_t FrameTimeouts = 0;
+// keep an array of pointers similar to original design
+static c_OutputRmt *    rmt_isr_ThisPtrs[MAX_NUM_RMT_CHANNELS] = { nullptr };
 
 #ifdef USE_RMT_DEBUG_COUNTERS
 static uint32_t RawIsrCounter = 0;
 #endif // def USE_RMT_DEBUG_COUNTERS
 
+static TaskHandle_t SendFrameTaskHandle = NULL;
+static BaseType_t xHigherPriorityTaskWoken = pdTRUE;
+static uint32_t FrameCompletes = 0;
+static uint32_t FrameTimeouts = 0;
+
+// small struct passed to watcher task
+struct TransmitWatcherParam {
+    int channel;
+    rmt_item32_t * items;
+    size_t count;
+};
+
+// watcher task: waits until RMT tx done, notifies send task and frees the buffer
+static void TransmitWatcherTask(void * arg)
+{
+    TransmitWatcherParam * p = (TransmitWatcherParam*)arg;
+    int ch = p->channel;
+    // wait until the RMT transmitter finishes for this channel
+    rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
+    // notify the sendframe task that the transmission finished (to mimic original behavior)
+    if (SendFrameTaskHandle)
+    {
+        vTaskNotifyGiveFromISR(SendFrameTaskHandle, &xHigherPriorityTaskWoken);
+    }
+    // free the items memory
+    free(p->items);
+    free(p);
+    vTaskDelete(NULL);
+}
+
 //----------------------------------------------------------------------------
 void RMT_Task (void *arg)
 {
+    (void)arg;
     while(1)
     {
+        // Give the outputs a chance to catch up.
         delay(1);
+        // process all possible channels
         for (c_OutputRmt * pRmt : rmt_isr_ThisPtrs)
         {
+            // do we have a driver on this channel?
             if(nullptr != pRmt)
             {
+                // invoke the channel
                 if (pRmt->StartNextFrame())
                 {
+                    // wait for notification that the frame finished (emulates old behavior)
                     uint32_t NotificationValue = ulTaskNotifyTake( pdTRUE, pdMS_TO_TICKS(100) );
                     if(1 == NotificationValue)
                     {
@@ -79,31 +107,14 @@ c_OutputRmt::~c_OutputRmt ()
         String Reason = (F("Shutting down an RMT channel requires a reboot"));
         RequestReboot(Reason, 100000);
 
-        // Clean up new API resources for this channel
         int ch = OutputRmtConfig.RmtChannelId;
-        if (g_rmt_chan_handles[ch])
-        {
-            rmt_disable(g_rmt_chan_handles[ch]);
-            rmt_del_channel(g_rmt_chan_handles[ch]);
-            g_rmt_chan_handles[ch] = nullptr;
-        }
-        if (g_rmt_encoders[ch])
-        {
-            rmt_del_encoder(g_rmt_encoders[ch]);
-            g_rmt_encoders[ch] = nullptr;
-        }
+        // disable channel and driver for that channel
+        rmt_set_gpio_in_out((rmt_channel_t)ch, RMT_MODE_TX, (gpio_num_t)OutputRmtConfig.DataPin); // best effort no-op alternative
+        rmt_driver_uninstall((rmt_channel_t)ch);
 
         rmt_isr_ThisPtrs[OutputRmtConfig.RmtChannelId] = (c_OutputRmt*)nullptr;
     }
 } // ~c_OutputRmt
-
-//----------------------------------------------------------------------------
-/* keep stubbed intr handler for compatibility (not used on S3 copy-encoder send path) */
-static void IRAM_ATTR rmt_intr_handler (void* param)
-{
-    (void)param;
-} // rmt_intr_handler
-
 
 //----------------------------------------------------------------------------
 void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
@@ -112,16 +123,18 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
     {
         if(HasBeenInitialized)
         {
+            // release the old GPIO pin.
             ResetGpio(OutputRmtConfig.DataPin);
         }
 
+        // save the new config
         OutputRmtConfig = config;
 
         #if defined(SUPPORT_OutputType_DMX) || defined(SUPPORT_OutputType_Serial) || defined(SUPPORT_OutputType_Renard)
         if ((nullptr == OutputRmtConfig.pPixelDataSource) && (nullptr == OutputRmtConfig.pSerialDataSource))
 #else
         if (nullptr == OutputRmtConfig.pPixelDataSource)
-#endif
+#endif // defined(SUPPORT_OutputType_DMX) || defined(SUPPORT_OutputType_Serial) || defined(SUPPORT_OutputType_Renard)
         {
             String Reason = (F("Invalid RMT configuration parameters. Rebooting"));
             RequestReboot(Reason, 10000);
@@ -138,48 +151,49 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
             TxIntensityDataStartingMask = 1;
         }
 
-        // Configure new RMT TX channel (ESP-IDF v5 style)
-        rmt_tx_channel_config_t tx_chan_cfg;
-        memset(&tx_chan_cfg, 0, sizeof(tx_chan_cfg));
-        tx_chan_cfg.gpio_num = (gpio_num_t)OutputRmtConfig.DataPin;
-        tx_chan_cfg.clk_src = RMT_CLK_SRC_DEFAULT;
-        // Provide a high resolution (10 MHz) to keep fine granularity similar to original clock divisor approach
-        tx_chan_cfg.resolution_hz = 10 * 1000 * 1000;
-        // Use a reasonable memory block size (64 symbols) - adjust if you need more
-        tx_chan_cfg.mem_block_symbols = 64;
-        tx_chan_cfg.trans_queue_depth = 4;
-        tx_chan_cfg.invert_out = false;
+        // Configure RMT channel using IDF4-style API
+        rmt_config_t RmtConfig;
+        memset(&RmtConfig, 0, sizeof(RmtConfig));
+        RmtConfig.rmt_mode = rmt_mode_t::RMT_MODE_TX;
+        RmtConfig.channel = (rmt_channel_t)OutputRmtConfig.RmtChannelId;
+        RmtConfig.gpio_num = (gpio_num_t)OutputRmtConfig.DataPin;
+        RmtConfig.clk_div = RMT_Clock_Divisor; // keep original divisor behavior
+        RmtConfig.mem_block_num = rmt_mem_block_t::RMT_MEM_64;
+        RmtConfig.tx_config.carrier_freq_hz = 10; // avoid zero due to driver bug
+        RmtConfig.tx_config.carrier_level = rmt_carrier_level_t::RMT_CARRIER_LEVEL_LOW;
+        RmtConfig.tx_config.carrier_duty_percent = 50;
+        RmtConfig.tx_config.idle_level = OutputRmtConfig.idle_level;
+        RmtConfig.tx_config.carrier_en = false;
+        RmtConfig.tx_config.loop_en = true;
+        RmtConfig.tx_config.idle_output_en = true;
 
-        int ch = OutputRmtConfig.RmtChannelId;
-        // create tx channel for this channel id
-        esp_err_t err = rmt_new_tx_channel(&tx_chan_cfg, &g_rmt_chan_handles[ch]);
-        if (err != ESP_OK)
-        {
-            logcon(String(CN_stars) + F(" ERROR: rmt_new_tx_channel failed") + CN_stars);
-            RequestReboot(F("RMT channel allocation failed"), 10000);
-            break;
-        }
-        ESP_ERROR_CHECK(rmt_enable(g_rmt_chan_handles[ch]));
+        ResetGpio(OutputRmtConfig.DataPin);
+        ESP_ERROR_CHECK(rmt_config(&RmtConfig));
 
-        // create copy encoder (we will feed already prepared RMT symbols)
-        rmt_copy_encoder_config_t copy_enc_cfg;
-        memset(&copy_enc_cfg, 0, sizeof(copy_enc_cfg));
-        ESP_ERROR_CHECK(rmt_new_copy_encoder(&copy_enc_cfg, &g_rmt_encoders[ch]));
+        // install driver for that channel (channel mask uses 1<<channel)
+        uint32_t ch_mask = (1u << OutputRmtConfig.RmtChannelId);
+        ESP_ERROR_CHECK(rmt_driver_install(ch_mask, 0, NULL));
 
-        // start background send task if not running
+        // NOTE: we are NOT using direct register-based ISR anymore. The code will start
+        // asynchronous writes and use a watcher task to wait for completion and notify.
+
+        // reset the internal indices & buffer counters
+        ISR_ResetRmtBlockPointers ();
+        memset((void*)&SendBuffer[0], 0x0, sizeof(SendBuffer));
+
+        UpdateBitXlatTable(OutputRmtConfig.CitrdsArray);
+
         if(!SendFrameTaskHandle)
         {
             xTaskCreatePinnedToCore(RMT_Task, "RMT_Task", 4096, NULL, 5, &SendFrameTaskHandle, 1);
             vTaskPrioritySet(SendFrameTaskHandle, 5);
         }
-
         pParent = _pParent;
         rmt_isr_ThisPtrs[OutputRmtConfig.RmtChannelId] = this;
 
         HasBeenInitialized = true;
     } while (false);
 } // Begin
-
 
 //----------------------------------------------------------------------------
 void c_OutputRmt::UpdateBitXlatTable(const CitrdsArray_t * CitrdsArray)
@@ -214,7 +228,7 @@ bool c_OutputRmt::ValidateBitXlatTable(const CitrdsArray_t * CitrdsArray)
             {
                 logcon(String(CN_stars) + F("ERROR: incorrect bit translation deteced. Chan: ") + String(OutputRmtConfig.RmtChannelId) +
                         F(" Slot: ") + String(CurrentTranslation->Id) +
-                        F(" Got: 0x") + String(uint32_t(Intensity2Rmt[CurrentTranslation->Id].val), HEX) +
+                        F(" Got: 0x") + String(Intensity2Rmt[CurrentTranslation->Id].val, HEX) +
                         F(" Expected: 0x") + String(CurrentTranslation->Translation.val));
             }
 
@@ -237,6 +251,13 @@ void c_OutputRmt::GetStatus (ArduinoJson::JsonObject& jsonStatus)
     JsonObject debugStatus = jsonStatus["RMT Debug"].to<JsonObject>();
     debugStatus["RmtChannelId"]                 = OutputRmtConfig.RmtChannelId;
     debugStatus["GPIO"]                         = OutputRmtConfig.DataPin;
+
+    // register-based fields are no longer available without direct register access,
+    // so mark them as N/A to avoid compile errors and keep the JSON schema stable.
+    debugStatus["conf0"]                        = String("N/A");
+    debugStatus["conf1"]                        = String("N/A");
+    debugStatus["tx_lim_ch"]                    = String("N/A");
+
     debugStatus["ErrorIsr"]                     = ErrorIsr;
     debugStatus["FrameCompletes"]               = String (FrameCompletes);
     debugStatus["FrameStartCounter"]            = FrameStartCounter;
@@ -252,6 +273,7 @@ void c_OutputRmt::GetStatus (ArduinoJson::JsonObject& jsonStatus)
     debugStatus["ISRcounter"]                   = ISRcounter;
     debugStatus["NumIdleBits"]                  = OutputRmtConfig.NumIdleBits;
     debugStatus["NumFrameStartBits"]            = OutputRmtConfig.NumFrameStartBits;
+    debugStatus["NumFrameStopBits"]             = OutputRmtConfig.NumFrameStopBits;
     debugStatus["NumRmtSlotsPerIntensityValue"] = NumRmtSlotsPerIntensityValue;
     debugStatus["OneBitValue"]                  = String (Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID].val,  HEX);
     debugStatus["RanOutOfData"]                 = RanOutOfData;
@@ -278,7 +300,7 @@ void IRAM_ATTR c_OutputRmt::ISR_CreateIntensityData ()
     register uint32_t OneBitValue  = Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID].val;
     register uint32_t ZeroBitValue = Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID].val;
 
-    uint32_t IntensityValue;
+    uint32_t IntensityValue; // = 0;
     uint32_t NumAvailableBufferSlotsToFill = NUM_RMT_SLOTS - NumUsedEntriesInSendBuffer;
     while ((NumAvailableBufferSlotsToFill > NumRmtSlotsPerIntensityValue) && ThereIsDataToSend)
     {
@@ -291,6 +313,7 @@ void IRAM_ATTR c_OutputRmt::ISR_CreateIntensityData ()
         }
 #endif // def USE_RMT_DEBUG_COUNTERS
 
+        // convert the intensity data into RMT slot data
         uint32_t bitmask = TxIntensityDataStartingMask;
         for (uint32_t BitCount = OutputRmtConfig.IntensityDataWidth; 0 < BitCount; --BitCount)
         {
@@ -327,6 +350,7 @@ void IRAM_ATTR c_OutputRmt::ISR_CreateIntensityData ()
             RMT_DEBUG_COUNTER(BitTypeCounters[int(RmtDataBitIdType_t::RMT_STOP_START_BIT_ID)]++);
         }
 
+        // recalc how much space is still in the buffer.
         NumAvailableBufferSlotsToFill = (NUM_RMT_SLOTS - 1) - NumUsedEntriesInSendBuffer;
     } // end while there is space in the buffer
 } // ISR_Handler_SendIntensityData
@@ -351,7 +375,7 @@ inline bool IRAM_ATTR c_OutputRmt::ISR_GetNextIntensityToSend(uint32_t &DataToSe
 //----------------------------------------------------------------------------
 void IRAM_ATTR c_OutputRmt::ISR_Handler (uint32_t isrFlags)
 {
-    // This ISR handler used to handle register interrupts; for S3/copy-encoder approach it is not used.
+    // ISR_Handler is retained for API compatibility, but we do not use register-level IRQ handling.
     (void)isrFlags;
 } // ISR_Handler
 
@@ -375,7 +399,7 @@ inline bool IRAM_ATTR c_OutputRmt::ISR_MoreDataToSend()
 //----------------------------------------------------------------------------
 inline void IRAM_ATTR c_OutputRmt::ISR_ResetRmtBlockPointers()
 {
-    // With new API we don't touch hardware pointers directly; just reset our indices
+    // No hardware pointer manipulation: just reset the software ring indices
     RmtBufferWriteIndex = 0;
     SendBufferWriteIndex = 0;
     SendBufferReadIndex  = 0;
@@ -400,23 +424,11 @@ inline void IRAM_ATTR c_OutputRmt::ISR_StartNewDataFrame()
 //----------------------------------------------------------------------------
 void IRAM_ATTR c_OutputRmt::ISR_TransferIntensityDataToRMT (uint32_t MaxNumEntriesToTransfer)
 {
-    uint32_t NumEntriesToTransfer = min(NumUsedEntriesInSendBuffer, MaxNumEntriesToTransfer);
-
-#ifdef USE_RMT_DEBUG_COUNTERS
-    if(NumEntriesToTransfer)
-    {
-        ++RmtXmtFills;
-        RmtEntriesTransfered = NumEntriesToTransfer;
-    }
-#endif // def USE_RMT_DEBUG_COUNTERS
-    while(NumEntriesToTransfer)
-    {
-        // Previously we copied into hardware RMT memory. Now we keep them in the software ring
-        // SendBuffer already contains the prepared rmt_item32_t values; the transfer to hardware will be done
-        // by assembling a contiguous payload and calling rmt_transmit() from StartNewFrame().
-        --NumEntriesToTransfer;
-    }
-
+    // In the old register-based code this copied into RMTMEM.chan[].data32.
+    // Here we just keep data in the software ring buffer (SendBuffer). The actual transfer
+    // to the hardware happens at StartNewFrame by copying into a contiguous block and calling rmt_write_items.
+    (void)MaxNumEntriesToTransfer;
+    // nothing to do here except bookkeeping (already handled by ISR_WriteToBuffer)
 } // ISR_Handler_TransferBufferToRMT
 
 //----------------------------------------------------------------------------
@@ -436,7 +448,7 @@ void c_OutputRmt::PauseOutput(bool PauseOutput)
     }
     else if (PauseOutput)
     {
-        // stop output - no hardware interrupts to disable in new API path
+        // no-op: using function API, no direct interrupt disabling here
     }
 
     OutputIsPaused = PauseOutput;
@@ -497,26 +509,18 @@ bool c_OutputRmt::StartNewFrame ()
         // refill if needed
         ISR_CreateIntensityData();
 
-        // At this point we have some prepared SendBuffer entries. For ESP32-S3 we will
-        // collect all generated entries (stream style) into a contiguous vector of rmt_symbol_word_t
-        // and call rmt_transmit() once with the whole payload (copy encoder).
-
-        std::vector<rmt_symbol_word_t> tx_symbols;
-        tx_symbols.reserve(1024); // pre-alloc a reasonable amount; grows if necessary
+        // Collect SendBuffer entries into a contiguous array for rmt_write_items()
+        std::vector<rmt_item32_t> tx_items;
+        tx_items.reserve(NumUsedEntriesInSendBuffer + 8);
 
         // drain current buffer first, then generate more until no more data
         while(true)
         {
-            // move available SendBuffer items to tx_symbols
+            // move available SendBuffer items to tx_items
             while(NumUsedEntriesInSendBuffer)
             {
                 rmt_item32_t &it = SendBuffer[SendBufferReadIndex];
-                rmt_symbol_word_t sym;
-                sym.duration0 = it.duration0;
-                sym.level0    = it.level0;
-                sym.duration1 = it.duration1;
-                sym.level1    = it.level1;
-                tx_symbols.push_back(sym);
+                tx_items.push_back(it);
 
                 SendBufferReadIndex = (SendBufferReadIndex + 1) & (NUM_RMT_SLOTS - 1);
                 --NumUsedEntriesInSendBuffer;
@@ -537,30 +541,53 @@ bool c_OutputRmt::StartNewFrame ()
             }
         }
 
-        // If we requested SendEndOfFrame bits earlier, they were written by ISR_CreateIntensityData.
-        // Ensure we terminate with an empty symbol (duration0 = 0) as marker (original code wrote 0).
-        rmt_symbol_word_t term_sym = {0, 0, 0, 0};
-        tx_symbols.push_back(term_sym);
+        // ensure termination value like original (0)
+        rmt_item32_t terminator;
+        terminator.val = 0;
+        tx_items.push_back(terminator);
 
-        // Transmit the built symbol array using the copy encoder
-        rmt_transmit_config_t tx_cfg;
-        memset(&tx_cfg, 0, sizeof(tx_cfg));
-        tx_cfg.loop_count = 0;
-
-        int ch = OutputRmtConfig.RmtChannelId;
-        if (g_rmt_chan_handles[ch] == nullptr || g_rmt_encoders[ch] == nullptr)
+        // Copy into heap memory because rmt_write_items may use the buffer asynchronously.
+        size_t count = tx_items.size();
+        rmt_item32_t * heap_items = (rmt_item32_t*)malloc(count * sizeof(rmt_item32_t));
+        if(!heap_items)
         {
-            logcon(String(CN_stars) + F(" ERROR: RMT channel/encoder not initialized") + CN_stars);
+            logcon(String(CN_stars) + F(" ERROR: malloc failed for RMT items") + CN_stars);
+            break;
+        }
+        memcpy(heap_items, tx_items.data(), count * sizeof(rmt_item32_t));
+
+        // Start non-blocking transmit: write items and return immediately.
+        int ch = OutputRmtConfig.RmtChannelId;
+        esp_err_t err = rmt_write_items((rmt_channel_t)ch, heap_items, count, false); // non-blocking
+        if (err != ESP_OK)
+        {
+            logcon(String(CN_stars) + F(" ERROR: rmt_write_items failed") + CN_stars);
+            free(heap_items);
             break;
         }
 
-        // Perform the transmit (blocking in driver until payload consumed)
-        esp_err_t err = rmt_transmit(g_rmt_chan_handles[ch], g_rmt_encoders[ch],
-                                     tx_symbols.data(), tx_symbols.size() * sizeof(rmt_symbol_word_t), &tx_cfg);
-        if (err != ESP_OK)
+        // create a watcher param to free buffer and notify when done
+        TransmitWatcherParam * p = (TransmitWatcherParam*)malloc(sizeof(TransmitWatcherParam));
+        if(!p)
         {
-            logcon(String(CN_stars) + F(" ERROR: rmt_transmit failed") + CN_stars);
-            // we still mark response false so caller knows
+            logcon(String(CN_stars) + F(" ERROR: malloc failed for watcher param") + CN_stars);
+            // If we cannot create watcher, at least wait here (blocking) and then free
+            rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
+            free(heap_items);
+            break;
+        }
+        p->channel = ch;
+        p->items = heap_items;
+        p->count = count;
+
+        // spawn a small task to wait for completion and notify SendFrameTaskHandle (mimic old ISR notify)
+        BaseType_t rc = xTaskCreatePinnedToCore(TransmitWatcherTask, "RmtWch", 2048, p, 5, NULL, 1);
+        if (rc != pdPASS)
+        {
+            // fallback: block until done then free
+            rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
+            free(heap_items);
+            free(p);
             break;
         }
 
