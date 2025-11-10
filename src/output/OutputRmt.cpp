@@ -580,16 +580,15 @@ bool c_OutputRmt::StartNewFrame ()
         p->items = heap_items;
         p->count = count;
 
-        // spawn a small task to wait for completion and notify SendFrameTaskHandle (mimic old ISR notify)
-        BaseType_t rc = xTaskCreatePinnedToCore(TransmitWatcherTask, "RmtWch", 2048, p, 5, NULL, 1);
-        if (rc != pdPASS)
-        {
-            // fallback: block until done then free
-            rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
-            free(heap_items);
-            free(p);
-            break;
-        }
+        // Wait synchronously for TX completion (no extra task → no heap use)
+		rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
+		free(heap_items);
+		free(p);
+
+		// notify SendFrameTaskHandle to keep timing identical
+		if (SendFrameTaskHandle) {
+			vTaskNotifyGiveFromISR(SendFrameTaskHandle, &xHigherPriorityTaskWoken);
+		}
 
         Response = true;
     } while(false);
