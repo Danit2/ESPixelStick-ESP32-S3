@@ -19,9 +19,9 @@
 */
 
 //Output Manager
-#define DEFAULT_RMT_0_GPIO     gpio_num_t::GPIO_NUM_1
-#define DEFAULT_RMT_1_GPIO     gpio_num_t::GPIO_NUM_2
-#define DEFAULT_RMT_2_GPIO     gpio_num_t::GPIO_NUM_4
+#define DEFAULT_RMT_0_GPIO     gpio_num_t::GPIO_NUM_4
+#define DEFAULT_RMT_1_GPIO     gpio_num_t::GPIO_NUM_5
+#define DEFAULT_RMT_2_GPIO     gpio_num_t::GPIO_NUM_6
 
 
 // File Manager
@@ -29,9 +29,7 @@
 #define SD_CARD_MISO_PIN        gpio_num_t::GPIO_NUM_8
 #define SD_CARD_MOSI_PIN        gpio_num_t::GPIO_NUM_9
 #define SD_CARD_CLK_PIN         gpio_num_t::GPIO_NUM_7
-#define SD_CARD_CS_PIN          gpio_num_t::GPIO_NUM_43
-
-#define DEFAULT_RELAY_GPIO      gpio_num_t::GPIO_NUM_44
+#define SD_CARD_CS_PIN          gpio_num_t::GPIO_NUM_1
 
 // Output Types
 // Not Finished - #define SUPPORT_OutputType_TLS3001
@@ -47,5 +45,5 @@
 // #define SUPPORT_OutputType_UCS8903          // UART / RMT
 // #define SUPPORT_OutputType_WS2801           // SPI
 #define SUPPORT_OutputType_WS2811           // UART / RMT
-#define SUPPORT_OutputType_Relay            // GPIO
+// #define SUPPORT_OutputType_Relay            // GPIO
 // #define SUPPORT_OutputType_Servo_PCA9685    // I2C (default pins)
