@@ -157,7 +157,7 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
         RmtConfig.rmt_mode = rmt_mode_t::RMT_MODE_TX;
         RmtConfig.channel = (rmt_channel_t)OutputRmtConfig.RmtChannelId;
         RmtConfig.gpio_num = (gpio_num_t)OutputRmtConfig.DataPin;
-        RmtConfig.clk_div = RMT_Clock_Divisor; // keep original divisor behavior
+        RmtConfig.clk_div = 1; // feine Auflösung: 12.5 ns ticks
         RmtConfig.mem_block_num = 1;
         RmtConfig.tx_config.carrier_freq_hz = 10; // avoid zero due to driver bug
         RmtConfig.tx_config.carrier_level = rmt_carrier_level_t::RMT_CARRIER_LEVEL_LOW;

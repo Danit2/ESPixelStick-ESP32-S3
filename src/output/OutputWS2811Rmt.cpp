@@ -94,6 +94,14 @@ bool c_OutputWS2811Rmt::SetConfig (ArduinoJson::JsonObject& jsonConfig)
     uint32_t ifgNS = (InterFrameGapInMicroSec * NanoSecondsInAMicroSecond);
     uint32_t ifgTicks = ifgNS / RMT_TickLengthNS;
 
+	logcon(String("RMT_TickLengthNS=") + String(RMT_TickLengthNS) +
+       " ifgTicks=" + String(ifgTicks) +
+       " T0H=" + String(WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH) +
+       " T0L=" + String(WS2811_PIXEL_RMT_TICKS_BIT_0_LOW) +
+       " T1H=" + String(WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH) +
+       " T1L=" + String(WS2811_PIXEL_RMT_TICKS_BIT_1_LOW));
+
+
     // Default is 100us * 3
     rmt_item32_t BitValue;
     // by default there are 6 rmt_item32_t instances replicated for the start of a frame.
@@ -106,7 +114,7 @@ bool c_OutputWS2811Rmt::SetConfig (ArduinoJson::JsonObject& jsonConfig)
     c_OutputRmt::OutputRmtConfig_t OutputRmtConfig;
     OutputRmtConfig.RmtChannelId      = rmt_channel_t(OutputChannelId);
     OutputRmtConfig.DataPin           = gpio_num_t(DataPin);
-    OutputRmtConfig.idle_level        = rmt_idle_level_t::RMT_IDLE_LEVEL_HIGH;
+    OutputRmtConfig.idle_level        = rmt_idle_level_t::RMT_IDLE_LEVEL_LOW;
     OutputRmtConfig.pPixelDataSource  = this;
     OutputRmtConfig.NumFrameStartBits = 0;
     OutputRmtConfig.CitrdsArray       = ConvertIntensityToRmtDataStream;
