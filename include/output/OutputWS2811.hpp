@@ -67,7 +67,7 @@ protected:
     #define WS2811_PIXEL_NS_BIT_1_LOW       (WS2811_PIXEL_NS_BIT_TOTAL - WS2811_PIXEL_NS_BIT_1_HIGH)
 #endif // ARDUINO_ARCH_ESP32
 
-#define WS2811_PIXEL_IDLE_TIME_US           350.0 // 350us per datasheet
+#define WS2811_PIXEL_IDLE_TIME_US           400.0 // 350us per datasheet
 #define WS2811_PIXEL_IDLE_TIME_NS           WS2811_PIXEL_IDLE_TIME_US * NanoSecondsInAMicroSecond
 
 #define WS2811_PIXEL_BITS_PER_INTENSITY     8
