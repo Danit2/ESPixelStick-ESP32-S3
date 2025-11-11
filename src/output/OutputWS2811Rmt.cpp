@@ -1,5 +1,5 @@
-#include "OutputWS2811Rmt.hpp"
-#include "OutputMgr.hpp"
+#include "output/OutputWS2811Rmt.hpp"
+#include "output/OutputMgr.hpp"
 
 #ifdef SUPPORT_OutputType_WS2811
 
