@@ -86,9 +86,9 @@ void c_OutputWS2811Rmt::Begin ()
 	
 	#if defined(ARDUINO_ARCH_ESP32)
     // Stärkere Treiberstufe und Pullups/Pulldowns aus
-		if (gpio_is_valid((gpio_num_t)DataPin)) {
-			gpio_set_pull_mode((gpio_num_t)DataPin, GPIO_FLOATING);            // keine Pullups oder Pulldowns
-			gpio_set_drive_capability((gpio_num_t)DataPin, GPIO_DRIVE_CAP_MAX); // maximale Ausgangsstärke
+		if (DataPin >= 0 && DataPin < GPIO_NUM_MAX) {
+			gpio_set_pull_mode((gpio_num_t)DataPin, GPIO_FLOATING);
+			gpio_set_drive_capability((gpio_num_t)DataPin, GPIO_DRIVE_CAP_MAX);
 		}
 	#endif
 
