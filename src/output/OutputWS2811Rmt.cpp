@@ -32,7 +32,7 @@
 #define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW     uint16_t(((1250.0 - 250.0) / RMT_TickLengthNS) + 0.5)
 #define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH    uint16_t((600.0 / RMT_TickLengthNS) + 0.5)
 #define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW     uint16_t(((1250.0 - 600.0) / RMT_TickLengthNS) + 0.5)
-
+#define WS2811_PIXEL_RMT_TICKS_IDLE          uint16_t ( (WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 1.0)
 
 static const c_OutputRmt::ConvertIntensityToRmtDataStreamEntry_t ConvertIntensityToRmtDataStream[] =
 {
