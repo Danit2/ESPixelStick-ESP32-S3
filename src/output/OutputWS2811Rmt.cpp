@@ -82,13 +82,21 @@ void c_OutputWS2811Rmt::Begin()
     c_OutputWS2811::Begin();
 
     // --- Pin vorbereiten ---
-    if (gpio_is_valid_gpio_num((gpio_num_t)DataPin)) {
-        gpio_set_level((gpio_num_t)DataPin, 0);
+    bool pinIsValid = false;
+#if defined(gpio_is_valid_gpio_num)
+    pinIsValid = gpio_is_valid_gpio_num((gpio_num_t)DataPin);
+#elif defined(gpio_is_valid)
+    pinIsValid = gpio_is_valid((gpio_num_t)DataPin);
+#else
+    // Fallback: einfache Bereichsprüfung
+    pinIsValid = (DataPin >= 0 && DataPin <= GPIO_NUM_MAX);
+#endif
 
-        // Keine Pullups / Pulldowns
+    if (pinIsValid) {
+        gpio_set_direction((gpio_num_t)DataPin, GPIO_MODE_OUTPUT);
+        gpio_set_level((gpio_num_t)DataPin, 0);
         gpio_set_pull_mode((gpio_num_t)DataPin, GPIO_FLOATING);
 
-        // Ausgangstreiber auf stark stellen
         esp_err_t err = gpio_set_drive_capability((gpio_num_t)DataPin, GPIO_DRIVE_CAP_3);
         if (err != ESP_OK) {
             logcon(String("[WARN] gpio_set_drive_capability failed on pin ")
@@ -100,12 +108,10 @@ void c_OutputWS2811Rmt::Begin()
 
     // --- RMT Idle-Level korrekt setzen ---
     rmt_channel_t channel = (rmt_channel_t)OutputChannelId;
-
-    // IDF v5 Signatur: esp_err_t rmt_set_idle_level(channel, enable, level)
     esp_err_t rmtErr = rmt_set_idle_level(channel, true, RMT_IDLE_LEVEL_LOW);
     if (rmtErr != ESP_OK) {
-        logcon(String("[WARN] rmt_set_idle_level failed on channel ") + String(channel)
-             + " (code " + String(rmtErr) + ")");
+        logcon(String("[WARN] rmt_set_idle_level failed on channel ")
+             + String(channel) + " (code " + String(rmtErr) + ")");
     }
 
     HasBeenInitialized = true;
