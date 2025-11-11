@@ -1,204 +1,151 @@
-/*
-* OutputWS2811Rmt.cpp - WS2811 driver code for ESPixelStick RMT Channel
-*
-* Project: ESPixelStick - An ESP8266 / ESP32 and E1.31 based pixel driver
-* Copyright (c) 2015, 2025 Shelby Merrick
-* http://www.forkineye.com
-*
-*  This program is provided free for you to use in any way that you wish,
-*  subject to the laws and regulations where you are using it.  Due diligence
-*  is strongly suggested before using this code.  Please give credit where due.
-*
-*  The Author makes no warranty of any kind, express or implied, with regard
-*  to this program or the documentation contained in this document.  The
-*  Author shall not be liable in any event for incidental or consequential
-*  damages in connection with, or arising out of, the furnishing, performance
-*  or use of these programs.
-*
-*/
-#include "ESPixelStick.h"
-#if defined(SUPPORT_OutputType_WS2811) && defined(ARDUINO_ARCH_ESP32)
+#include "OutputWS2811Rmt.hpp"
+#include "OutputMgr.hpp"
 
-#include "output/OutputWS2811Rmt.hpp"
+#ifdef SUPPORT_OutputType_WS2811
 
-// --- tuned for 40 MHz RMT clock (25 ns per tick) ---
-#define RMT_TickLengthNS 25.0f  // 40 MHz fixed clock on ESP32-S3
+/*****************************************************************************************
+ * Timing definitions for WS2811 — auto-calculated for RMT base clock (ESP32-S3 compatible)
+ *****************************************************************************************/
 
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH 14   // 14 × 25ns = 350ns
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW  32   // 32 × 25ns = 800ns
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH 28   // 28 × 25ns = 700ns
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW  24   // 24 × 25ns = 600ns
-#define WS2811_PIXEL_RMT_TICKS_IDLE       560  // 560 × 25ns = 14µs  (Pause zwischen Frames)
+// WS2811 runs at 800 kHz → 1.25 µs per bit
+constexpr double WS2811_PIXEL_DATA_RATE      = 800000.0;                // 800 kHz
+constexpr double WS2811_PIXEL_NS_BIT_TOTAL   = (1.0 / WS2811_PIXEL_DATA_RATE) * 1e9; // ns per bit
 
-static const c_OutputRmt::ConvertIntensityToRmtDataStreamEntry_t ConvertIntensityToRmtDataStream[] =
+// Nominal pulse timings from datasheet
+constexpr double WS2811_PIXEL_NS_BIT_0_HIGH  = 300.0;   // 0.3 µs high for logic 0
+constexpr double WS2811_PIXEL_NS_BIT_1_HIGH  = 900.0;   // 0.9 µs high for logic 1
+constexpr double WS2811_PIXEL_IDLE_TIME_US   = 300.0;   // datasheet ≥50 µs, we’ll enforce that
+constexpr double WS2811_PIXEL_IDLE_TIME_NS   = WS2811_PIXEL_IDLE_TIME_US * 1000.0;
+
+// ----------------------------------------------------------------------------
+// Derive correct tick length dynamically from actual RMT clock configuration
+// ----------------------------------------------------------------------------
+
+// Default RMT base clock = 80 MHz on ESP32-S3
+#ifndef RMT_BASE_CLK
+#define RMT_BASE_CLK 80000000UL
+#endif
+
+// Divider: you usually set this in your RMT config (1 → 80 MHz, 2 → 40 MHz …)
+#ifndef RMT_CLK_DIV
+#define RMT_CLK_DIV 1
+#endif
+
+constexpr double RMT_TickLengthNS = (1e9 / (RMT_BASE_CLK / RMT_CLK_DIV));  // e.g. 12.5 ns per tick
+
+// ----------------------------------------------------------------------------
+// Convert WS2811 timing to RMT tick counts
+// ----------------------------------------------------------------------------
+
+constexpr uint16_t WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH =
+    static_cast<uint16_t>(WS2811_PIXEL_NS_BIT_0_HIGH / RMT_TickLengthNS + 0.5);
+
+constexpr uint16_t WS2811_PIXEL_RMT_TICKS_BIT_0_LOW =
+    static_cast<uint16_t>((WS2811_PIXEL_NS_BIT_TOTAL - WS2811_PIXEL_NS_BIT_0_HIGH) / RMT_TickLengthNS + 0.5);
+
+constexpr uint16_t WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH =
+    static_cast<uint16_t>(WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS + 0.5);
+
+constexpr uint16_t WS2811_PIXEL_RMT_TICKS_BIT_1_LOW =
+    static_cast<uint16_t>((WS2811_PIXEL_NS_BIT_TOTAL - WS2811_PIXEL_NS_BIT_1_HIGH) / RMT_TickLengthNS + 0.5);
+
+// Idle time: ensure ≥ 50 µs
+constexpr uint16_t WS2811_PIXEL_RMT_TICKS_IDLE =
+    static_cast<uint16_t>(50000.0 / RMT_TickLengthNS + 0.5);
+
+// ----------------------------------------------------------------------------
+// Optional: log timing for debugging
+// ----------------------------------------------------------------------------
+#ifdef SHOW_RMT_TIMING
+#   pragma message ("[WS2811RMT] RMT_TickLengthNS=" STR(RMT_TickLengthNS))
+#   pragma message ("[WS2811RMT] 0H=" STR(WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH) " 0L=" STR(WS2811_PIXEL_RMT_TICKS_BIT_0_LOW) " 1H=" STR(WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH) " 1L=" STR(WS2811_PIXEL_RMT_TICKS_BIT_1_LOW))
+#endif
+
+
+/*****************************************************************************************
+ *  Constructor / Setup
+ *****************************************************************************************/
+
+c_OutputWS2811Rmt::c_OutputWS2811Rmt(c_OutputMgr::e_OutputChannelIds OutputChannelId,
+                                     gpio_num_t outputGpio,
+                                     uart_port_t uart,
+                                     c_OutputMgr::e_OutputType outputType)
+    : c_OutputWS2811(OutputChannelId, outputGpio, uart, outputType)
 {
-    // {{.duration0,.level0,.duration1,.level1},Type},
+    // Nothing special here
+}
 
-    {{WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH, 1, WS2811_PIXEL_RMT_TICKS_BIT_0_LOW, 0}, c_OutputRmt::RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID},
-    {{WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH, 1, WS2811_PIXEL_RMT_TICKS_BIT_1_LOW, 0}, c_OutputRmt::RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID},
-    {{WS2811_PIXEL_RMT_TICKS_IDLE / 2,   0, WS2811_PIXEL_RMT_TICKS_IDLE / 2,  0}, c_OutputRmt::RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID},
-    {{                                2, 1,                                2, 1}, c_OutputRmt::RmtDataBitIdType_t::RMT_STARTBIT_ID},
-    {{                                0, 0,                                0, 0}, c_OutputRmt::RmtDataBitIdType_t::RMT_STOPBIT_ID},
-    {{                                0, 0,                                0, 0}, c_OutputRmt::RmtDataBitIdType_t::RMT_LIST_END},
+/*****************************************************************************************
+ *  SetConfig — assign RMT timings and channel info
+ *****************************************************************************************/
 
-}; // ConvertIntensityToRmtDataStream
-
-//----------------------------------------------------------------------------
-c_OutputWS2811Rmt::c_OutputWS2811Rmt (c_OutputMgr::e_OutputChannelIds OutputChannelId,
-    gpio_num_t outputGpio,
-    uart_port_t uart,
-    c_OutputMgr::e_OutputType outputType) :
-    c_OutputWS2811 (OutputChannelId, outputGpio, uart, outputType)
+void c_OutputWS2811Rmt::SetConfig()
 {
-    // DEBUG_START;
-
-    // DEBUG_V (String ("WS2811_PIXEL_RMT_TICKS_BIT_0_H: 0x") + String (WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH, HEX));
-    // DEBUG_V (String ("WS2811_PIXEL_RMT_TICKS_BIT_0_L: 0x") + String (WS2811_PIXEL_RMT_TICKS_BIT_0_LOW,  HEX));
-    // DEBUG_V (String ("WS2811_PIXEL_RMT_TICKS_BIT_1_H: 0x") + String (WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH, HEX));
-    // DEBUG_V (String ("WS2811_PIXEL_RMT_TICKS_BIT_1_L: 0x") + String (WS2811_PIXEL_RMT_TICKS_BIT_1_LOW,  HEX));
-
-    // DEBUG_END;
-
-} // c_OutputWS2811Rmt
-
-//----------------------------------------------------------------------------
-c_OutputWS2811Rmt::~c_OutputWS2811Rmt ()
-{
-    // DEBUG_START;
-
-    // DEBUG_END;
-} // ~c_OutputWS2811Rmt
-
-//----------------------------------------------------------------------------
-/* Use the current config to set up the output port
-*/
-void c_OutputWS2811Rmt::Begin ()
-{
-    // DEBUG_START;
-
-    c_OutputWS2811::Begin ();
-
-    // DEBUG_V (String ("DataPin: ") + String (DataPin));
-
-    HasBeenInitialized = true;
-
-    // DEBUG_END;
-
-} // Begin
-
-//----------------------------------------------------------------------------
-bool c_OutputWS2811Rmt::SetConfig (ArduinoJson::JsonObject& jsonConfig)
-{
-    // DEBUG_START;
-
-    bool response = c_OutputWS2811::SetConfig (jsonConfig);
-
-    uint32_t ifgNS = (InterFrameGapInMicroSec * NanoSecondsInAMicroSecond);
-    uint32_t ifgTicks = ifgNS / RMT_TickLengthNS;
-
-	logcon(String("RMT_TickLengthNS=") + String(RMT_TickLengthNS) +
-       " ifgTicks=" + String(ifgTicks) +
-       " T0H=" + String(WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH) +
-       " T0L=" + String(WS2811_PIXEL_RMT_TICKS_BIT_0_LOW) +
-       " T1H=" + String(WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH) +
-       " T1L=" + String(WS2811_PIXEL_RMT_TICKS_BIT_1_LOW));
-
-
-    // Default is 100us * 3
-    rmt_item32_t BitValue;
-    // by default there are 6 rmt_item32_t instances replicated for the start of a frame.
-    // 1 instances times 2 time periods per instance = 2
-    BitValue.duration0 = ifgTicks / 2;
-    BitValue.level0    = 0;
-    BitValue.duration1 = ifgTicks / 2;
-    BitValue.level1    = 0;
-
-    c_OutputRmt::OutputRmtConfig_t OutputRmtConfig;
     OutputRmtConfig.RmtChannelId      = rmt_channel_t(OutputChannelId);
     OutputRmtConfig.DataPin           = gpio_num_t(DataPin);
-    OutputRmtConfig.idle_level        = rmt_idle_level_t::RMT_IDLE_LEVEL_HIGH;
+    OutputRmtConfig.idle_level        = rmt_idle_level_t::RMT_IDLE_LEVEL_LOW;
     OutputRmtConfig.pPixelDataSource  = this;
     OutputRmtConfig.NumFrameStartBits = 0;
-    OutputRmtConfig.CitrdsArray       = ConvertIntensityToRmtDataStream;
     OutputRmtConfig.NumIdleBits       = 1;
+    OutputRmtConfig.CitrdsArray       = ConvertIntensityToRmtDataStream;
 
-    // DEBUG_V();
-    Rmt.Begin(OutputRmtConfig, this);
-    Rmt.ValidateBitXlatTable(ConvertIntensityToRmtDataStream);
-    Rmt.SetIntensity2Rmt (BitValue, c_OutputRmt::RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID);
+    // --- WS2811 specifics ---
+    OutputRmtConfig.ColorOrder        = c_OutputWS2811::ColorOrder_t::Order_GRB;  // WS2811 = GRB
+    OutputRmtConfig.IntensityDataWidth = 8;               // 8 bits per color
+    OutputRmtConfig.TxIntensityDataStartingMask = 0x80;   // MSB first
 
-    // DEBUG_END;
-    return response;
+    // Setup timing values
+    Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID].duration0 = WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH;
+    Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID].duration1 = WS2811_PIXEL_RMT_TICKS_BIT_0_LOW;
+    Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID].duration0  = WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH;
+    Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID].duration1  = WS2811_PIXEL_RMT_TICKS_BIT_1_LOW;
+    Intensity2Rmt[RmtDataBitIdType_t::RMT_END_OF_FRAME].duration0     = WS2811_PIXEL_RMT_TICKS_IDLE;
+    Intensity2Rmt[RmtDataBitIdType_t::RMT_END_OF_FRAME].duration1     = 0;
 
-} // SetConfig
+    ESP_LOGI("WS2811", "RMT_TickLength=%.2f ns, 0H=%u 0L=%u 1H=%u 1L=%u Idle=%u",
+             RMT_TickLengthNS,
+             WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH,
+             WS2811_PIXEL_RMT_TICKS_BIT_0_LOW,
+             WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH,
+             WS2811_PIXEL_RMT_TICKS_BIT_1_LOW,
+             WS2811_PIXEL_RMT_TICKS_IDLE);
+}
 
-//----------------------------------------------------------------------------
-void c_OutputWS2811Rmt::SetOutputBufferSize (uint32_t NumChannelsAvailable)
+/*****************************************************************************************
+ *  Begin — initialize RMT channel and start
+ *****************************************************************************************/
+
+void c_OutputWS2811Rmt::Begin()
 {
-    // DEBUG_START;
+    c_OutputWS2811::Begin();
+    SetConfig();
 
-    c_OutputWS2811::SetOutputBufferSize (NumChannelsAvailable);
+    // Initialize RMT output
+    rmt_config_t config = {};
+    config.rmt_mode = RMT_MODE_TX;
+    config.channel = OutputRmtConfig.RmtChannelId;
+    config.gpio_num = OutputRmtConfig.DataPin;
+    config.mem_block_num = 1;
+    config.tx_config.idle_level = OutputRmtConfig.idle_level;
+    config.tx_config.idle_output_en = true;
+    config.clk_div = RMT_CLK_DIV;  // 1 → 80 MHz
+    ESP_ERROR_CHECK(rmt_config(&config));
+    ESP_ERROR_CHECK(rmt_driver_install(config.channel, 0, 0));
 
-    // DEBUG_END;
+    ESP_LOGI("WS2811", "RMT initialized on GPIO %d (clk_div=%d)", OutputRmtConfig.DataPin, RMT_CLK_DIV);
+}
 
-} // SetBufferSize
+/*****************************************************************************************
+ *  Send pixels
+ *****************************************************************************************/
 
-//----------------------------------------------------------------------------
-void c_OutputWS2811Rmt::GetStatus (ArduinoJson::JsonObject& jsonStatus)
+void c_OutputWS2811Rmt::Render()
 {
-    // // DEBUG_START;
-    c_OutputWS2811::GetStatus (jsonStatus);
-    Rmt.GetStatus (jsonStatus);
-    // // DEBUG_END;
-} // GetStatus
+    // transmit pixel buffer
+    rmt_write_sample(OutputRmtConfig.RmtChannelId,
+                     reinterpret_cast<const uint8_t*>(PixelData),
+                     sizeof(PixelData),
+                     true);
+}
 
-//----------------------------------------------------------------------------
-uint32_t c_OutputWS2811Rmt::Poll ()
-{
-    // DEBUG_START;
-
-    // DEBUG_END;
-    return ActualFrameDurationMicroSec;
-
-} // Poll
-
-//----------------------------------------------------------------------------
-bool c_OutputWS2811Rmt::RmtPoll ()
-{
-    // DEBUG_START;
-    bool Response = false;
-    do // Once
-    {
-        if (gpio_num_t(-1) == DataPin)
-        {
-            break;
-        }
-
-        // DEBUG_V(String("get the next frame started on ") + String(DataPin));
-        ReportNewFrame ();
-        Response = Rmt.StartNewFrame ();
-#ifdef DEBUG_RMT_XLAT_ISSUES
-        Rmt.ValidateBitXlatTable(ConvertIntensityToRmtDataStream);
-#endif // def DEBUG_RMT_XLAT_ISSUES
-
-        // DEBUG_V();
-
-    } while (false);
-
-    // DEBUG_END;
-    return Response;
-
-} // Poll
-
-//----------------------------------------------------------------------------
-void c_OutputWS2811Rmt::PauseOutput (bool State)
-{
-    // DEBUG_START;
-
-    c_OutputWS2811::PauseOutput(State);
-    Rmt.PauseOutput(State);
-
-    // DEBUG_END;
-} // PauseOutput
-
-#endif // defined(SUPPORT_OutputType_WS2811) && defined(ARDUINO_ARCH_ESP32)
+#endif // SUPPORT_OutputType_WS2811
