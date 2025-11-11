@@ -145,7 +145,7 @@ public:
 
 #if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ARCH_ESP32S3)
     // ESP32-S3 typically uses 40 MHz RMT base clock → 25 ns per tick
-    #define RMT_ClockRate       80000000.0
+    #define RMT_ClockRate       40000000.0
     #define RMT_Clock_Divisor   2.0
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
     // ESP32-S2 also 40 MHz
