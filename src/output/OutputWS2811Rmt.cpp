@@ -81,28 +81,32 @@ void c_OutputWS2811Rmt::Begin()
 {
     c_OutputWS2811::Begin();
 
-    // Setze GPIO-Level sicher auf LOW, bevor RMT aktiviert wird
-    if (gpio_is_valid_gpio((gpio_num_t)DataPin)) {
+    // --- Pin vorbereiten ---
+    if (gpio_is_valid_gpio_num((gpio_num_t)DataPin)) {
         gpio_set_level((gpio_num_t)DataPin, 0);
 
-        // Pull-ups/Pull-downs deaktivieren (Leitung muss hochohmig sein)
+        // Keine Pullups / Pulldowns
         gpio_set_pull_mode((gpio_num_t)DataPin, GPIO_FLOATING);
 
-        // Maximale Ausgangstreiberstärke setzen (wichtig für WS2811)
-        esp_err_t err = gpio_set_drive_capability((gpio_num_t)DataPin, GPIO_DRIVE_CAP_MAX);
+        // Ausgangstreiber auf stark stellen
+        esp_err_t err = gpio_set_drive_capability((gpio_num_t)DataPin, GPIO_DRIVE_CAP_3);
         if (err != ESP_OK) {
-            logcon(String("[WARN] gpio_set_drive_capability failed on pin ") +
-                   String(DataPin) + " (code " + String(err) + ")");
+            logcon(String("[WARN] gpio_set_drive_capability failed on pin ")
+                 + String(DataPin) + " (code " + String(err) + ")");
         }
     } else {
         logcon(String("[WARN] Invalid GPIO for WS2811 output: ") + String(DataPin));
     }
 
-    // RMT Idle-Level auf LOW erzwingen (damit Leitung in Ruhezustand LOW bleibt)
-    // Beachte: OutputRmtConfig ist hier lokal, du solltest Channel ID aus deiner Instanz holen
+    // --- RMT Idle-Level korrekt setzen ---
     rmt_channel_t channel = (rmt_channel_t)OutputChannelId;
-    rmt_set_tx_idle_level(channel, RMT_IDLE_LEVEL_LOW, true);
-    rmt_set_idle_level(channel, RMT_IDLE_LEVEL_LOW, true);
+
+    // IDF v5 Signatur: esp_err_t rmt_set_idle_level(channel, enable, level)
+    esp_err_t rmtErr = rmt_set_idle_level(channel, true, RMT_IDLE_LEVEL_LOW);
+    if (rmtErr != ESP_OK) {
+        logcon(String("[WARN] rmt_set_idle_level failed on channel ") + String(channel)
+             + " (code " + String(rmtErr) + ")");
+    }
 
     HasBeenInitialized = true;
 } // Begin
