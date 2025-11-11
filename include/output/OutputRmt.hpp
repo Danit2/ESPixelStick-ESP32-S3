@@ -54,7 +54,7 @@ public:
     {
         rmt_channel_t       RmtChannelId           = rmt_channel_t(-1);
         gpio_num_t          DataPin                = gpio_num_t(-1);
-        rmt_idle_level_t    idle_level             = rmt_idle_level_t::RMT_IDLE_LEVEL_LOW;
+        rmt_idle_level_t    idle_level             = rmt_idle_level_t::RMT_IDLE_LEVEL_HIGH;
         uint32_t            IntensityDataWidth     = 8;
         bool                SendInterIntensityBits = false;
         bool                SendEndOfFrameBits     = false;

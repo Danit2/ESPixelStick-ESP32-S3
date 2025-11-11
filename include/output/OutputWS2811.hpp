@@ -61,9 +61,9 @@ protected:
     #define WS2811_PIXEL_NS_BIT_1_HIGH      WS2811_PIXEL_NS_BIT_0_LOW
     #define WS2811_PIXEL_NS_BIT_1_LOW       WS2811_PIXEL_NS_BIT_0_HIGH
 #else
-    #define WS2811_PIXEL_NS_BIT_0_HIGH      300.0 //312.0 // 220ns - 380ns per datasheet
+    #define WS2811_PIXEL_NS_BIT_0_HIGH      312.0 // 220ns - 380ns per datasheet
     #define WS2811_PIXEL_NS_BIT_0_LOW       (WS2811_PIXEL_NS_BIT_TOTAL - WS2811_PIXEL_NS_BIT_0_HIGH)
-    #define WS2811_PIXEL_NS_BIT_1_HIGH      WS2811_PIXEL_NS_BIT_0_LOW //975.0 // 580ns - 1.6us per datasheet
+    #define WS2811_PIXEL_NS_BIT_1_HIGH      975.0 // 580ns - 1.6us per datasheet
     #define WS2811_PIXEL_NS_BIT_1_LOW       (WS2811_PIXEL_NS_BIT_TOTAL - WS2811_PIXEL_NS_BIT_1_HIGH)
 #endif // ARDUINO_ARCH_ESP32
 

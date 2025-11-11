@@ -28,12 +28,10 @@
 // #define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 1.0)
 // #define WS2811_PIXEL_RMT_TICKS_IDLE          uint16_t ( (WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 1.0)
 
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH   uint16_t(((250.0 + 25.0) / RMT_TickLengthNS) + 0.5)   // ~11 Ticks
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW    uint16_t(((1000.0 - 25.0) / RMT_TickLengthNS) + 0.5)  // ~39 Ticks
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH   uint16_t(((1000.0 + 25.0) / RMT_TickLengthNS) + 0.5)  // ~41 Ticks
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW    uint16_t(((250.0 - 25.0) / RMT_TickLengthNS) + 0.5)   // ~9 Ticks
-
-// Idle-Zeit: mindestens 300 µs (Datenblatt), wir nehmen 350 µs als Reserve
+#define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH   uint16_t(((250.0 + 50.0) / RMT_TickLengthNS) + 0.5)
+#define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW    uint16_t(((1000.0 - 50.0) / RMT_TickLengthNS) + 0.5)
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH   uint16_t(((1000.0 + 50.0) / RMT_TickLengthNS) + 0.5)
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW    uint16_t(((250.0 - 50.0) / RMT_TickLengthNS) + 0.5)
 #define WS2811_PIXEL_RMT_TICKS_IDLE          uint16_t((WS2811_PIXEL_IDLE_TIME_NS / RMT_TickLengthNS) + 1.0)
 
 static const c_OutputRmt::ConvertIntensityToRmtDataStreamEntry_t ConvertIntensityToRmtDataStream[] =
