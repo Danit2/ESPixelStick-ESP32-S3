@@ -22,11 +22,17 @@
 #include "output/OutputWS2811Rmt.hpp"
 
 // The adjustments compensate for rounding errors in the calculations
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_0_HIGH / RMT_TickLengthNS) + 0.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_0_LOW  / RMT_TickLengthNS) + 0.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS) - 1.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 1.0)
-#define WS2811_PIXEL_RMT_TICKS_IDLE          uint16_t ( (WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 1.0)
+// #define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_0_HIGH / RMT_TickLengthNS) + 0.0)
+// #define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_0_LOW  / RMT_TickLengthNS) + 0.0)
+// #define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS) - 1.0)
+// #define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 1.0)
+// #define WS2811_PIXEL_RMT_TICKS_IDLE          uint16_t ( (WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 1.0)
+
+#define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH    uint16_t((250.0 / RMT_TickLengthNS) + 0.5)
+#define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW     uint16_t(((1250.0 - 250.0) / RMT_TickLengthNS) + 0.5)
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH    uint16_t((600.0 / RMT_TickLengthNS) + 0.5)
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW     uint16_t(((1250.0 - 600.0) / RMT_TickLengthNS) + 0.5)
+
 
 static const c_OutputRmt::ConvertIntensityToRmtDataStreamEntry_t ConvertIntensityToRmtDataStream[] =
 {
@@ -78,7 +84,7 @@ void c_OutputWS2811Rmt::Begin ()
 
     // DEBUG_V (String ("DataPin: ") + String (DataPin));
 	
-	#if defined(ARDUINO_ARCH_ESP32S3)
+	#if defined(ARDUINO_ARCH_ESP32)
     // Stärkere Treiberstufe und Pullups/Pulldowns aus
 		if (gpio_is_valid((gpio_num_t)DataPin)) {
 			gpio_set_pull_mode((gpio_num_t)DataPin, GPIO_FLOATING);            // keine Pullups oder Pulldowns
@@ -122,7 +128,7 @@ bool c_OutputWS2811Rmt::SetConfig (ArduinoJson::JsonObject& jsonConfig)
     c_OutputRmt::OutputRmtConfig_t OutputRmtConfig;
     OutputRmtConfig.RmtChannelId      = rmt_channel_t(OutputChannelId);
     OutputRmtConfig.DataPin           = gpio_num_t(DataPin);
-    OutputRmtConfig.idle_level        = rmt_idle_level_t::RMT_IDLE_LEVEL_HIGH;
+    OutputRmtConfig.idle_level        = rmt_idle_level_t::RMT_IDLE_LEVEL_LOW;
     OutputRmtConfig.pPixelDataSource  = this;
     OutputRmtConfig.NumFrameStartBits = 0;
     OutputRmtConfig.CitrdsArray       = ConvertIntensityToRmtDataStream;
