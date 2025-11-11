@@ -8,12 +8,12 @@
  *****************************************************************************************/
 
 // WS2811 runs at 800 kHz → 1.25 µs per bit
-constexpr double WS2811_AUTO_PIXEL_DATA_RATE      = 800000.0;                // 800 kHz
-constexpr double WS2811_AUTO_PIXEL_NS_BIT_TOTAL   = (1.0 / WS2811_AUTO_PIXEL_DATA_RATE) * 1e9; // ns per bit
+constexpr double WS2811_AUTO_PIXEL_DATA_RATE      = 800000.0;                
+constexpr double WS2811_AUTO_PIXEL_NS_BIT_TOTAL   = (1.0 / WS2811_AUTO_PIXEL_DATA_RATE) * 1e9; 
 
-constexpr double WS2811_AUTO_PIXEL_NS_BIT_0_HIGH  = 300.0;   // 0.3 µs high for logic 0
-constexpr double WS2811_AUTO_PIXEL_NS_BIT_1_HIGH  = 900.0;   // 0.9 µs high for logic 1
-constexpr double WS2811_AUTO_PIXEL_IDLE_TIME_US   = 300.0;   // ≥50 µs required
+constexpr double WS2811_AUTO_PIXEL_NS_BIT_0_HIGH  = 300.0;   // 0.3 µs
+constexpr double WS2811_AUTO_PIXEL_NS_BIT_1_HIGH  = 900.0;   // 0.9 µs
+constexpr double WS2811_AUTO_PIXEL_IDLE_TIME_US   = 300.0;   
 constexpr double WS2811_AUTO_PIXEL_IDLE_TIME_NS   = WS2811_AUTO_PIXEL_IDLE_TIME_US * 1000.0;
 
 // ----------------------------------------------------------------------------
@@ -25,6 +25,7 @@ constexpr double WS2811_AUTO_PIXEL_IDLE_TIME_NS   = WS2811_AUTO_PIXEL_IDLE_TIME_
 #ifndef RMT_CLK_DIV
 #define RMT_CLK_DIV 1
 #endif
+
 constexpr double RMT_TickLengthNS_AUTO = (1e9 / (RMT_BASE_CLK / RMT_CLK_DIV));  // e.g. 12.5 ns per tick
 
 // ----------------------------------------------------------------------------
@@ -49,9 +50,7 @@ c_OutputWS2811Rmt::c_OutputWS2811Rmt(
 {
 }
 
-c_OutputWS2811Rmt::~c_OutputWS2811Rmt()
-{
-}
+c_OutputWS2811Rmt::~c_OutputWS2811Rmt() = default;
 
 /*****************************************************************************************
  *  SetConfig — read JSON and configure hardware
@@ -59,27 +58,41 @@ c_OutputWS2811Rmt::~c_OutputWS2811Rmt()
 
 bool c_OutputWS2811Rmt::SetConfig(ArduinoJson::JsonObject &jsonConfig)
 {
-    // Optional: read JSON fields (if present)
-    if (jsonConfig.containsKey("Pin"))
+    if (jsonConfig.contains("Pin"))
     {
         DataPin = gpio_num_t(jsonConfig["Pin"].as<int>());
     }
 
-    // pass config to underlying RMT driver
-    ArduinoJson::DynamicJsonDocument rmtDoc(1024);
-    JsonObject rmtCfg = rmtDoc.to<JsonObject>();
+    // Build RMT configuration struct
+    c_OutputRmt::OutputRmtConfig_t config = {};
+    config.DataPin        = DataPin;
+    config.RmtChannelId   = rmt_channel_t(OutputChannelId);
+    config.idle_level     = RMT_IDLE_LEVEL_LOW;
+    config.TxMethod       = c_OutputRmt::OutputRmtConfig_t::TX_METHOD_t::NORMAL;
+    config.IntensityDataWidth = 8;
+    config.TxIntensityDataStartingMask = 0x80;
+    config.NumFrameStartBits = 0;
+    config.NumIdleBits = 1;
 
-    rmtCfg["DataPin"]    = static_cast<int>(DataPin);
-    rmtCfg["ClkDiv"]     = RMT_CLK_DIV;
-    rmtCfg["T0H"]        = WS2811_AUTO_TICKS_BIT_0_HIGH;
-    rmtCfg["T0L"]        = WS2811_AUTO_TICKS_BIT_0_LOW;
-    rmtCfg["T1H"]        = WS2811_AUTO_TICKS_BIT_1_HIGH;
-    rmtCfg["T1L"]        = WS2811_AUTO_TICKS_BIT_1_LOW;
-    rmtCfg["IdleTicks"]  = WS2811_AUTO_TICKS_IDLE;
-    rmtCfg["ColorOrder"] = "GRB";
+    // Fill timing values
+    config.T0H = WS2811_AUTO_TICKS_BIT_0_HIGH;
+    config.T0L = WS2811_AUTO_TICKS_BIT_0_LOW;
+    config.T1H = WS2811_AUTO_TICKS_BIT_1_HIGH;
+    config.T1L = WS2811_AUTO_TICKS_BIT_1_LOW;
+    config.InterFrameGapTicks = WS2811_AUTO_TICKS_IDLE;
+    config.ColorOrder = c_OutputWS2811::ColorOrder_t::Order_GRB;
 
-    bool ok = Rmt.SetConfig(rmtCfg);
-    return ok;
+    // Save & apply configuration to RMT
+    Rmt.Begin(config, this);
+
+    ESP_LOGI("WS2811Rmt", 
+        "RMT configured: TickLen=%.2f ns, T0H=%u T0L=%u T1H=%u T1L=%u Idle=%u", 
+        RMT_TickLengthNS_AUTO,
+        WS2811_AUTO_TICKS_BIT_0_HIGH, WS2811_AUTO_TICKS_BIT_0_LOW,
+        WS2811_AUTO_TICKS_BIT_1_HIGH, WS2811_AUTO_TICKS_BIT_1_LOW,
+        WS2811_AUTO_TICKS_IDLE);
+
+    return true;
 }
 
 /*****************************************************************************************
@@ -90,16 +103,10 @@ void c_OutputWS2811Rmt::Begin()
 {
     c_OutputWS2811::Begin();
 
-    // prepare minimal configuration for WS2811
-    ArduinoJson::DynamicJsonDocument cfg(1024);
-    JsonObject json = cfg.to<JsonObject>();
+    // Minimal config if nothing loaded from JSON
+    ArduinoJson::JsonDocument json;
     json["Pin"] = static_cast<int>(DataPin);
-
-    // Apply configuration and start RMT driver
-    SetConfig(json);
-    Rmt.Begin();
-
-    ESP_LOGI("WS2811Rmt", "WS2811 RMT initialized on GPIO %d, clk_div=%d", DataPin, RMT_CLK_DIV);
+    SetConfig(json.as<ArduinoJson::JsonObject>());
 }
 
 /*****************************************************************************************
@@ -108,14 +115,10 @@ void c_OutputWS2811Rmt::Begin()
 
 uint32_t c_OutputWS2811Rmt::Poll()
 {
-    // Delegate the actual sending to RMT object
-    if (Rmt.DriverIsSendingIntensityData())
+    if (!Rmt.DriverIsSendingIntensityData())
     {
-        return 0;
+        Rmt.Poll(); // your Rmt class should already have this
     }
-
-    // Tell RMT to send current pixel data
-    Rmt.RmtPoll();
     return 0;
 }
 
