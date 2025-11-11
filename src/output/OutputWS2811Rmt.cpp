@@ -16,6 +16,7 @@
 *  or use of these programs.
 *
 */
+#include "driver/gpio.h"
 #include "ESPixelStick.h"
 #if defined(SUPPORT_OutputType_WS2811) && defined(ARDUINO_ARCH_ESP32)
 
@@ -76,27 +77,34 @@ c_OutputWS2811Rmt::~c_OutputWS2811Rmt ()
 //----------------------------------------------------------------------------
 /* Use the current config to set up the output port
 */
-void c_OutputWS2811Rmt::Begin ()
+void c_OutputWS2811Rmt::Begin()
 {
-    // DEBUG_START;
+    c_OutputWS2811::Begin();
 
-    c_OutputWS2811::Begin ();
+    // Setze GPIO-Level sicher auf LOW, bevor RMT aktiviert wird
+    if (gpio_is_valid_gpio((gpio_num_t)DataPin)) {
+        gpio_set_level((gpio_num_t)DataPin, 0);
 
-    // DEBUG_V (String ("DataPin: ") + String (DataPin));
-	
-	#if defined(ARDUINO_ARCH_ESP32)
-    // Stärkere Treiberstufe und Pullups/Pulldowns aus
-		if (DataPin >= 0 && DataPin < GPIO_NUM_MAX) {
-			gpio_set_pull_mode((gpio_num_t)DataPin, GPIO_FLOATING);
-			gpio_set_drive_capability((gpio_num_t)DataPin, GPIO_DRIVE_CAP_MAX);
-		}
-	#endif
+        // Pull-ups/Pull-downs deaktivieren (Leitung muss hochohmig sein)
+        gpio_set_pull_mode((gpio_num_t)DataPin, GPIO_FLOATING);
 
+        // Maximale Ausgangstreiberstärke setzen (wichtig für WS2811)
+        esp_err_t err = gpio_set_drive_capability((gpio_num_t)DataPin, GPIO_DRIVE_CAP_MAX);
+        if (err != ESP_OK) {
+            logcon(String("[WARN] gpio_set_drive_capability failed on pin ") +
+                   String(DataPin) + " (code " + String(err) + ")");
+        }
+    } else {
+        logcon(String("[WARN] Invalid GPIO for WS2811 output: ") + String(DataPin));
+    }
+
+    // RMT Idle-Level auf LOW erzwingen (damit Leitung in Ruhezustand LOW bleibt)
+    // Beachte: OutputRmtConfig ist hier lokal, du solltest Channel ID aus deiner Instanz holen
+    rmt_channel_t channel = (rmt_channel_t)OutputChannelId;
+    rmt_set_tx_idle_level(channel, RMT_IDLE_LEVEL_LOW, true);
+    rmt_set_idle_level(channel, RMT_IDLE_LEVEL_LOW, true);
 
     HasBeenInitialized = true;
-
-    // DEBUG_END;
-
 } // Begin
 
 //----------------------------------------------------------------------------
