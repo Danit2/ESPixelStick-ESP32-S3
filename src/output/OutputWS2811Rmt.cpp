@@ -22,12 +22,21 @@
 
 #include "output/OutputWS2811Rmt.hpp"
 
-// The adjustments compensate for rounding errors in the calculations
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_0_HIGH / RMT_TickLengthNS) + 0.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_0_LOW  / RMT_TickLengthNS) + 0.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS) - 1.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 1.0)
-#define WS2811_PIXEL_RMT_TICKS_IDLE          uint16_t ( (WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 1.0)
+// ---------------------------------------------------------------------------
+//  RMT Tick-Berechnung – universell stabil für WS2811 & WS2812B
+// ---------------------------------------------------------------------------
+// Der ESP32-S3 RMT hat kleine Rundungsfehler beim Timing.
+// Diese Offsets (+/-0.5 bis +/-1 Tick) korrigieren das und stabilisieren die Flanken.
+// ---------------------------------------------------------------------------
+
+#define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH  uint16_t(((WS2811_PIXEL_NS_BIT_0_HIGH / RMT_TickLengthNS) + 0.5))
+#define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW   uint16_t(((WS2811_PIXEL_NS_BIT_0_LOW  / RMT_TickLengthNS) + 0.5))
+
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH  uint16_t(((WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS) - 0.5))
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW   uint16_t(((WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 0.5))
+
+#define WS2811_PIXEL_RMT_TICKS_IDLE        uint16_t(((WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 1.0))
+
 
 
 static const c_OutputRmt::ConvertIntensityToRmtDataStreamEntry_t ConvertIntensityToRmtDataStream[] =
@@ -109,7 +118,30 @@ void c_OutputWS2811Rmt::Begin()
              + String(channel) + " (code " + String(rmtErr) + ")");
     }
 
+    // ======================================================
+    //   Diagnose-Log für WS2811 / WS2812 Timing
+    // ======================================================
+#if defined(SUPPORT_OutputType_WS2811)
+    {
+        float real_T0H_ns = WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH * RMT_TickLengthNS;
+        float real_T0L_ns = WS2811_PIXEL_RMT_TICKS_BIT_0_LOW  * RMT_TickLengthNS;
+        float real_T1H_ns = WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH * RMT_TickLengthNS;
+        float real_T1L_ns = WS2811_PIXEL_RMT_TICKS_BIT_1_LOW  * RMT_TickLengthNS;
+        float real_Tbit_ns = real_T0H_ns + real_T0L_ns;
+        float real_Reset_us = (WS2811_PIXEL_RMT_TICKS_IDLE * RMT_TickLengthNS) / 1000.0;
+
+        logcon(String("[WS281x Timing] Tick=") + String(RMT_TickLengthNS, 2) + "ns  " +
+               "T0H=" + String(real_T0H_ns, 0) + "ns  " +
+               "T0L=" + String(real_T0L_ns, 0) + "ns  " +
+               "T1H=" + String(real_T1H_ns, 0) + "ns  " +
+               "T1L=" + String(real_T1L_ns, 0) + "ns  " +
+               "Bit=" + String(real_Tbit_ns / 1000.0, 2) + "µs  " +
+               "Reset=" + String(real_Reset_us, 1) + "µs");
+    }
+#endif
+
     HasBeenInitialized = true;
+	
 } // Begin
 
 //----------------------------------------------------------------------------
