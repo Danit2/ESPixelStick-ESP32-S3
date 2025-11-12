@@ -176,7 +176,6 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
 		
 		// --- RMT Erweiterte Konfiguration ---
 		rmt_set_source_clk(config.RmtChannelId, RMT_BASECLK_APB); // Stabiler 80 MHz Takt
-		rmt_tx_carrier_disable(config.RmtChannelId);              // Kein PWM-Träger, WS2811/12 brauchen reines Bitstream
 		rmt_set_idle_level(config.RmtChannelId, true, RMT_IDLE_LEVEL_LOW); // Leitung ruht LOW
 
 		// Optional: Debug
