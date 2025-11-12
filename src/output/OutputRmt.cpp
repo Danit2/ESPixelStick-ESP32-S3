@@ -193,14 +193,15 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
 			}
 
 			// Make sure TX loop is disabled (some configs set loop_en accidentally)
-			#if defined(RMT_SET_TX_LOOP)
+			// Ensure TX loop is disabled (IDF4 vs IDF5 naming)
+			#if defined(rmt_set_tx_loop_mode)
+				rmt_set_tx_loop_mode(ch, false);
+			#elif defined(rmt_set_tx_loop)
 				rmt_set_tx_loop(ch, false);
 			#else
-				// use runtime API if available; safe to call even if not present on old IDF
-				#if defined(ESP_IDF_VERSION_MAJOR) && (ESP_IDF_VERSION_MAJOR >= 4)
-					rmt_set_tx_loop(ch, false);
-				#endif
+				// not available — ignore safely
 			#endif
+
 
 			// Small sanity log per channel (shows tick length macro + pin)
 			logcon(String("[RMT] Init Channel ") + String(OutputRmtConfig.RmtChannelId) +
