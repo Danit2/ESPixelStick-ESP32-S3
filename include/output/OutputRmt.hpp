@@ -147,14 +147,10 @@ public:
     // ESP32-S3 typically uses 40 MHz RMT base clock → 25 ns per tick
     #define RMT_ClockRate       80000000.0
     #define RMT_Clock_Divisor   1.0
-#elif defined(CONFIG_IDF_TARGET_ESP32S2)
-    // ESP32-S2 also 40 MHz
-    #define RMT_ClockRate       80000000.0
-    #define RMT_Clock_Divisor   1.0
 #else
     // Original ESP32 uses 80 MHz / 2 = 40 MHz
     #define RMT_ClockRate       80000000.0
-    #define RMT_Clock_Divisor   1.0
+    #define RMT_Clock_Divisor   2.0
 #endif
 
 #define RMT_TickLengthNS float( (1.0 / (RMT_ClockRate / RMT_Clock_Divisor)) * float(NanoSecondsInASecond) )

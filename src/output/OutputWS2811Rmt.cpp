@@ -22,22 +22,12 @@
 
 #include "output/OutputWS2811Rmt.hpp"
 
-// ---------------------------------------------------------------------------
-//  RMT Tick-Berechnung – universell stabil für WS2811 & WS2812B
-// ---------------------------------------------------------------------------
-// Der ESP32-S3 RMT hat kleine Rundungsfehler beim Timing.
-// Diese Offsets (+/-0.5 bis +/-1 Tick) korrigieren das und stabilisieren die Flanken.
-// ---------------------------------------------------------------------------
-
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH  uint16_t(((WS2811_PIXEL_NS_BIT_0_HIGH / RMT_TickLengthNS) + 0.5))
-#define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW   uint16_t(((WS2811_PIXEL_NS_BIT_0_LOW  / RMT_TickLengthNS) + 0.5))
-
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH  uint16_t(((WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS) - 0.5))
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW   uint16_t(((WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 0.5))
-
-#define WS2811_PIXEL_RMT_TICKS_IDLE        uint16_t(((WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 1.0))
-
-
+// The adjustments compensate for rounding errors in the calculations
+#define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_0_HIGH / RMT_TickLengthNS) + 0.0)
+#define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_0_LOW  / RMT_TickLengthNS) + 0.0)
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS) - 1.0)
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 1.0)
+#define WS2811_PIXEL_RMT_TICKS_IDLE          uint16_t ( (WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 1.0)
 
 static const c_OutputRmt::ConvertIntensityToRmtDataStreamEntry_t ConvertIntensityToRmtDataStream[] =
 {
