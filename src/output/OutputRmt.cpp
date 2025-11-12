@@ -132,9 +132,9 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
 
         #if defined(SUPPORT_OutputType_DMX) || defined(SUPPORT_OutputType_Serial) || defined(SUPPORT_OutputType_Renard)
         if ((nullptr == OutputRmtConfig.pPixelDataSource) && (nullptr == OutputRmtConfig.pSerialDataSource))
-#else
+		#else
         if (nullptr == OutputRmtConfig.pPixelDataSource)
-#endif // defined(SUPPORT_OutputType_DMX) || defined(SUPPORT_OutputType_Serial) || defined(SUPPORT_OutputType_Renard)
+		#endif // defined(SUPPORT_OutputType_DMX) || defined(SUPPORT_OutputType_Serial) || defined(SUPPORT_OutputType_Renard)
         {
             String Reason = (F("Invalid RMT configuration parameters. Rebooting"));
             RequestReboot(Reason, 10000);
@@ -173,6 +173,16 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
         // install driver for that channel (channel mask uses 1<<channel)
         uint32_t ch_mask = (1u << OutputRmtConfig.RmtChannelId);
         ESP_ERROR_CHECK(rmt_driver_install((rmt_channel_t)OutputRmtConfig.RmtChannelId, 0, 0));
+		
+		// --- RMT Erweiterte Konfiguration ---
+		rmt_set_source_clk(config.RmtChannelId, RMT_BASECLK_APB); // Stabiler 80 MHz Takt
+		rmt_tx_carrier_disable(config.RmtChannelId);              // Kein PWM-Träger, WS2811/12 brauchen reines Bitstream
+		rmt_set_idle_level(config.RmtChannelId, true, RMT_IDLE_LEVEL_LOW); // Leitung ruht LOW
+
+		// Optional: Debug
+		logcon(String("[RMT] Init Channel ") + String(config.RmtChannelId) + 
+			" Pin=" + String(config.DataPin) + 
+			" Tick=" + String(RMT_TickLengthNS, 2) + "ns");
 
         // NOTE: we are NOT using direct register-based ISR anymore. The code will start
         // asynchronous writes and use a watcher task to wait for completion and notify.
