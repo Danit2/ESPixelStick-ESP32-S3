@@ -164,7 +164,7 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
         RmtConfig.tx_config.carrier_duty_percent = 50;
         RmtConfig.tx_config.idle_level = OutputRmtConfig.idle_level;
         RmtConfig.tx_config.carrier_en = false;
-        RmtConfig.tx_config.loop_en = true;
+        RmtConfig.tx_config.loop_en = false;
         RmtConfig.tx_config.idle_output_en = true;
 
         ResetGpio(OutputRmtConfig.DataPin);
@@ -173,6 +173,54 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
         // install driver for that channel (channel mask uses 1<<channel)
         uint32_t ch_mask = (1u << OutputRmtConfig.RmtChannelId);
         ESP_ERROR_CHECK(rmt_driver_install((rmt_channel_t)OutputRmtConfig.RmtChannelId, 0, 0));
+		
+		// --- Erweiterte RMT-Konfiguration (kompatibel mit IDF4/IDF5) ---
+		{
+			rmt_channel_t ch = (rmt_channel_t)OutputRmtConfig.RmtChannelId;
+
+			// Force APB clock (80 MHz) for finer/consistent timing if platform supports it
+			#if defined(SOC_RMT_SUPPORT_REF_TICK)
+				esp_err_t eclk = rmt_set_source_clk(ch, RMT_BASECLK_APB);
+				if (eclk != ESP_OK) {
+					logcon(String("[WARN] rmt_set_source_clk failed for ch ") + String(ch) + " (" + String(eclk) + ")");
+				}
+			#endif
+
+			// Ensure idle output is enabled and set to desired level (IDF signature: channel, idle_out_en, level)
+			esp_err_t rml = rmt_set_idle_level(ch, true, OutputRmtConfig.idle_level);
+			if (rml != ESP_OK) {
+				logcon(String("[WARN] rmt_set_idle_level failed for ch ") + String(ch) + " (" + String(rml) + ")");
+			}
+
+			// Make sure TX loop is disabled (some configs set loop_en accidentally)
+			#if defined(RMT_SET_TX_LOOP)
+				rmt_set_tx_loop(ch, false);
+			#else
+				// use runtime API if available; safe to call even if not present on old IDF
+				#if defined(ESP_IDF_VERSION_MAJOR) && (ESP_IDF_VERSION_MAJOR >= 4)
+					rmt_set_tx_loop(ch, false);
+				#endif
+			#endif
+
+			// Small sanity log per channel (shows tick length macro + pin)
+			logcon(String("[RMT] Init Channel ") + String(OutputRmtConfig.RmtChannelId) +
+				" Pin=" + String(OutputRmtConfig.DataPin) +
+				" Tick=" + String(RMT_TickLengthNS, 2) + "ns" +
+				" IdleBits=" + String(OutputRmtConfig.NumIdleBits));
+
+			// Update & validate the bit translation table and report any mismatches
+			UpdateBitXlatTable(OutputRmtConfig.CitrdsArray);
+			bool ok = ValidateBitXlatTable(OutputRmtConfig.CitrdsArray);
+			// ValidateBitXlatTable currently logs details on mismatch, but we log a summary here
+			logcon(String("[RMT] ValidateBitXlatTable ch ") + String(ch) + (ok ? " OK" : " DONE (check logs)"));
+
+			// safety: ensure gpio is explicitly assigned for this channel (IDF may already have done this)
+			// rmt_set_gpio is optional; rmt_config already sets gpio, so only call if available to be explicit
+			#if defined(rmt_set_gpio)
+				rmt_set_gpio(ch, RMT_MODE_TX, (gpio_num_t)OutputRmtConfig.DataPin, true);
+			#endif
+		}
+
 		
 		// --- RMT Erweiterte Konfiguration ---
 		rmt_set_source_clk(config.RmtChannelId, RMT_BASECLK_APB); // Stabiler 80 MHz Takt
