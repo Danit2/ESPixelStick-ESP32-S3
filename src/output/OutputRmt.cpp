@@ -157,8 +157,8 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
         RmtConfig.rmt_mode = rmt_mode_t::RMT_MODE_TX;
         RmtConfig.channel = (rmt_channel_t)OutputRmtConfig.RmtChannelId;
         RmtConfig.gpio_num = (gpio_num_t)OutputRmtConfig.DataPin;
-        RmtConfig.clk_div = 1; // feine Auflösung: 12.5 ns ticks
-        RmtConfig.mem_block_num = 1;
+        RmtConfig.clk_div = RMT_Clock_Divisor;
+        RmtConfig.mem_block_num = rmt_reserve_memsize_t::RMT_MEM_64;
         RmtConfig.tx_config.carrier_freq_hz = 10; // avoid zero due to driver bug
         RmtConfig.tx_config.carrier_level = rmt_carrier_level_t::RMT_CARRIER_LEVEL_LOW;
         RmtConfig.tx_config.carrier_duty_percent = 50;
@@ -177,14 +177,6 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
 		// --- Erweiterte RMT-Konfiguration (kompatibel mit IDF4/IDF5) ---
 		{
 			rmt_channel_t ch = (rmt_channel_t)OutputRmtConfig.RmtChannelId;
-
-			// Force APB clock (80 MHz) for finer/consistent timing if platform supports it
-			#if defined(SOC_RMT_SUPPORT_REF_TICK)
-				esp_err_t eclk = rmt_set_source_clk(ch, RMT_BASECLK_APB);
-				if (eclk != ESP_OK) {
-					logcon(String("[WARN] rmt_set_source_clk failed for ch ") + String(ch) + " (" + String(eclk) + ")");
-				}
-			#endif
 
 			// Ensure idle output is enabled and set to desired level (IDF signature: channel, idle_out_en, level)
 			esp_err_t rml = rmt_set_idle_level(ch, true, OutputRmtConfig.idle_level);
@@ -221,11 +213,6 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
 				rmt_set_gpio(ch, RMT_MODE_TX, (gpio_num_t)OutputRmtConfig.DataPin, true);
 			#endif
 		}
-
-		
-		// --- RMT Erweiterte Konfiguration ---
-		rmt_set_source_clk(config.RmtChannelId, RMT_BASECLK_APB); // Stabiler 80 MHz Takt
-		rmt_set_idle_level(config.RmtChannelId, true, RMT_IDLE_LEVEL_LOW); // Leitung ruht LOW
 
 		// Optional: Debug
 		logcon(String("[RMT] Init Channel ") + String(config.RmtChannelId) + 

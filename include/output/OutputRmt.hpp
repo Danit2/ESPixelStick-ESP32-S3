@@ -143,15 +143,9 @@ public:
 
     bool DriverIsSendingIntensityData() {return 0 != InterrupsAreEnabled;}
 
-#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ARCH_ESP32S3)
-    // ESP32-S3 typically uses 40 MHz RMT base clock → 25 ns per tick
-    #define RMT_ClockRate       160000000.0
-    #define RMT_Clock_Divisor   2.0
-#else
-    // Original ESP32 uses 80 MHz / 2 = 40 MHz
-    #define RMT_ClockRate       80000000.0
-    #define RMT_Clock_Divisor   2.0
-#endif
+#define RMT_ClockRate       80000000.0
+#define RMT_Clock_Divisor   2.0
+#define RMT_TickLengthNS    float ( (1/ (RMT_ClockRate/RMT_Clock_Divisor)) * float(NanoSecondsInASecond))
 
 #define RMT_TickLengthNS float( (1.0 / (RMT_ClockRate / RMT_Clock_Divisor)) * float(NanoSecondsInASecond) )
 
