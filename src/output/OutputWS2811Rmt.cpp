@@ -167,7 +167,7 @@ bool c_OutputWS2811Rmt::SetConfig (ArduinoJson::JsonObject& jsonConfig)
     OutputRmtConfig.pPixelDataSource  = this;
     OutputRmtConfig.NumFrameStartBits = 0;
     OutputRmtConfig.CitrdsArray       = ConvertIntensityToRmtDataStream;
-    OutputRmtConfig.NumIdleBits       = 2;
+    OutputRmtConfig.NumIdleBits       = 1;
 
     // DEBUG_V();
     Rmt.Begin(OutputRmtConfig, this);
