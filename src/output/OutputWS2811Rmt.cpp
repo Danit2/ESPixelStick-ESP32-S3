@@ -25,9 +25,9 @@
 // The adjustments compensate for rounding errors in the calculations
 #define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_0_HIGH / RMT_TickLengthNS) + 0.0)
 #define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_0_LOW  / RMT_TickLengthNS) + 0.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS) - 1.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 1.0)
-#define WS2811_PIXEL_RMT_TICKS_IDLE          uint16_t ( (WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 1.0)
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS) - 0.0)
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 0.0)
+#define WS2811_PIXEL_RMT_TICKS_IDLE          uint16_t ( (WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 0.0)
 
 static const c_OutputRmt::ConvertIntensityToRmtDataStreamEntry_t ConvertIntensityToRmtDataStream[] =
 {

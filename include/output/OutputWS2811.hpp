@@ -52,11 +52,16 @@ protected:
 #define WS2811_PIXEL_DATA_RATE              800000.0 // 800 KHz
 #define WS2811_PIXEL_NS_BIT_TOTAL           ((1.0 / WS2811_PIXEL_DATA_RATE) * NanoSecondsInASecond)
 
-// WS2812B Timing (typisch):
-#define WS2811_PIXEL_NS_BIT_0_HIGH      350.0   // 0 = 350ns HIGH
-#define WS2811_PIXEL_NS_BIT_0_LOW       (WS2811_PIXEL_NS_BIT_TOTAL - WS2811_PIXEL_NS_BIT_0_HIGH) // ≈ 900ns LOW
-#define WS2811_PIXEL_NS_BIT_1_HIGH      700.0   // 1 = 700ns HIGH
-#define WS2811_PIXEL_NS_BIT_1_LOW       (WS2811_PIXEL_NS_BIT_TOTAL - WS2811_PIXEL_NS_BIT_1_HIGH) // ≈ 550ns LOW
+#define WS2811_PIXEL_NS_BIT_0_HIGH      350.0
+#define WS2811_PIXEL_NS_BIT_0_LOW       800.0   // kürzer als vorher (nicht 900!)
+#define WS2811_PIXEL_NS_BIT_1_HIGH      700.0
+#define WS2811_PIXEL_NS_BIT_1_LOW       550.0
+
+//WS2812B Timing (typisch):
+// #define WS2811_PIXEL_NS_BIT_0_HIGH      350.0   // 0 = 350ns HIGH
+// #define WS2811_PIXEL_NS_BIT_0_LOW       (WS2811_PIXEL_NS_BIT_TOTAL - WS2811_PIXEL_NS_BIT_0_HIGH) // ≈ 900ns LOW
+// #define WS2811_PIXEL_NS_BIT_1_HIGH      700.0   // 1 = 700ns HIGH
+// #define WS2811_PIXEL_NS_BIT_1_LOW       (WS2811_PIXEL_NS_BIT_TOTAL - WS2811_PIXEL_NS_BIT_1_HIGH) // ≈ 550ns LOW
 
 #define WS2811_PIXEL_IDLE_TIME_US           80.0 // WS2812B braucht nur 50µs, 80µs ist sicher
 #define WS2811_PIXEL_IDLE_TIME_NS           (WS2811_PIXEL_IDLE_TIME_US * NanoSecondsInAMicroSecond)
