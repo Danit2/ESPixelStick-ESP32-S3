@@ -501,21 +501,38 @@ bool c_OutputRmt::StartNewFrame()
 {
     bool Response = false;
 
-    do
+    do // once
     {
-        if (OutputIsPaused) break;
-        if (InterrupsAreEnabled) { RMT_DEBUG_COUNTER(IncompleteFrame++); }
+        if (OutputIsPaused)
+        {
+            logcon("[RMT] Output paused - skipping frame");
+            break;
+        }
+
+        if (InterrupsAreEnabled)
+        {
+            RMT_DEBUG_COUNTER(IncompleteFrame++);
+        }
 
         // Reset indices
         ISR_ResetRmtBlockPointers();
 
-        // Inter-Frame-Gap
-        for (uint32_t i = 0; i < OutputRmtConfig.NumIdleBits; i++)
+        // --- Inter-frame gap ---
+        uint32_t NumInterFrameRmtSlotsCount = 0;
+        while (NumInterFrameRmtSlotsCount < OutputRmtConfig.NumIdleBits)
+        {
             ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID].val);
+            ++NumInterFrameRmtSlotsCount;
+            RMT_DEBUG_COUNTER(BitTypeCounters[int(RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID)]++);
+        }
 
-        // Frame-Start-Bits
-        for (uint32_t i = 0; i < OutputRmtConfig.NumFrameStartBits; i++)
+        // --- Frame start bits ---
+        uint32_t NumFrameStartRmtSlotsCount = 0;
+        while (NumFrameStartRmtSlotsCount++ < OutputRmtConfig.NumFrameStartBits)
+        {
             ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_STARTBIT_ID].val);
+            RMT_DEBUG_COUNTER(BitTypeCounters[int(RmtDataBitIdType_t::RMT_STARTBIT_ID)]++);
+        }
 
 #ifdef USE_RMT_DEBUG_COUNTERS
         FrameStartCounter++;
@@ -525,50 +542,82 @@ bool c_OutputRmt::StartNewFrame()
         IntensityBitsSent = 0;
 #endif
 
+        // --- New frame setup ---
         ISR_StartNewDataFrame();
+
+        // create initial data
         ThereIsDataToSend = ISR_MoreDataToSend();
         ISR_CreateIntensityData();
-        ISR_CreateIntensityData();
 
+        // Collect SendBuffer entries into contiguous array
         std::vector<rmt_item32_t> tx_items;
-        tx_items.reserve(NumUsedEntriesInSendBuffer + 8);
+        tx_items.reserve(NUM_RMT_SLOTS + 64);
 
-        while (NumUsedEntriesInSendBuffer)
+        while (ISR_MoreDataToSend() || NumUsedEntriesInSendBuffer)
         {
-            tx_items.push_back(SendBuffer[SendBufferReadIndex]);
-            SendBufferReadIndex = (SendBufferReadIndex + 1) & (NUM_RMT_SLOTS - 1);
-            --NumUsedEntriesInSendBuffer;
+            // drain SendBuffer
+            while (NumUsedEntriesInSendBuffer)
+            {
+                tx_items.push_back(SendBuffer[SendBufferReadIndex]);
+                SendBufferReadIndex = (SendBufferReadIndex + 1) & (NUM_RMT_SLOTS - 1);
+                --NumUsedEntriesInSendBuffer;
+            }
+
+            // generate more data if available
+            if (ISR_MoreDataToSend())
+            {
+                ISR_CreateIntensityData();
+            }
         }
 
+        // Terminator element
         rmt_item32_t terminator;
         terminator.val = 0;
         tx_items.push_back(terminator);
 
         size_t count = tx_items.size();
-        rmt_item32_t* heap_items = (rmt_item32_t*)malloc(count * sizeof(rmt_item32_t));
+        int ch = OutputRmtConfig.RmtChannelId;
+
+        logcon(String("[RMT] Channel ") + String(ch) + 
+               " sending " + String(count) + " RMT items (" +
+               String(float(count) / 24.0, 1) + " pixelbits approx.)");
+
+        if (count < 100)
+        {
+            logcon(String("[RMT] WARNING: only ") + String(count) + 
+                   " items generated -> check ISR_MoreDataToSend()");
+        }
+
+        // Copy into heap buffer for RMT driver
+        rmt_item32_t *heap_items = (rmt_item32_t*)malloc(count * sizeof(rmt_item32_t));
         if (!heap_items)
         {
-            logcon(String(CN_stars) + F(" ERROR: malloc failed for RMT items") + CN_stars);
+            logcon("[RMT] ERROR: malloc failed for RMT items");
             break;
         }
         memcpy(heap_items, tx_items.data(), count * sizeof(rmt_item32_t));
 
-        int ch = OutputRmtConfig.RmtChannelId;
-        esp_err_t err = rmt_write_items((rmt_channel_t)ch, heap_items, count, true); // true = blocking
-        free(heap_items);
-
+        // --- Transmit (blocking for debug reliability) ---
+        esp_err_t err = rmt_write_items((rmt_channel_t)ch, heap_items, count, true);
         if (err != ESP_OK)
         {
-            logcon(String(CN_stars) + F(" ERROR: rmt_write_items failed") + CN_stars);
+            logcon(String("[RMT] ERROR: rmt_write_items failed, err=") + String(err));
+            free(heap_items);
             break;
         }
 
+        // optional blocking wait for completion
+        rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
+        free(heap_items);
+
+        // notify send-task if used
         if (SendFrameTaskHandle)
         {
             xTaskNotifyGive(SendFrameTaskHandle);
         }
 
         Response = true;
+
     } while (false);
 
     return Response;
