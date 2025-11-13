@@ -331,62 +331,44 @@ void c_OutputRmt::GetStatus (ArduinoJson::JsonObject& jsonStatus)
 //----------------------------------------------------------------------------
 void IRAM_ATTR c_OutputRmt::ISR_CreateIntensityData ()
 {
-    register uint32_t OneBitValue  = Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID].val;
-    register uint32_t ZeroBitValue = Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID].val;
+    const uint32_t OneBitValue  = Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID].val;
+    const uint32_t ZeroBitValue = Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID].val;
 
-    uint32_t IntensityValue; // = 0;
+    uint32_t IntensityValue;
     uint32_t NumAvailableBufferSlotsToFill = NUM_RMT_SLOTS - NumUsedEntriesInSendBuffer;
+
     while ((NumAvailableBufferSlotsToFill > NumRmtSlotsPerIntensityValue) && ThereIsDataToSend)
     {
         ThereIsDataToSend = ISR_GetNextIntensityToSend(IntensityValue);
         RMT_DEBUG_COUNTER(IntensityValuesSent++);
-#ifdef USE_RMT_DEBUG_COUNTERS
-        if(200 < IntensityValue)
-        {
-            ++RmtWhiteDetected;
-        }
-#endif // def USE_RMT_DEBUG_COUNTERS
 
-        // convert the intensity data into RMT slot data
+        // logcon(String("Pixel intensity: ") + String(IntensityValue));
+
         uint32_t bitmask = TxIntensityDataStartingMask;
-        for (uint32_t BitCount = OutputRmtConfig.IntensityDataWidth; 0 < BitCount; --BitCount)
+
+        for (uint32_t BitCount = OutputRmtConfig.IntensityDataWidth; BitCount > 0; --BitCount)
         {
+            bool bitSet = (IntensityValue & bitmask);
+            ISR_WriteToBuffer(bitSet ? OneBitValue : ZeroBitValue);
             RMT_DEBUG_COUNTER(IntensityBitsSent++);
-            ISR_WriteToBuffer((IntensityValue & bitmask) ? OneBitValue : ZeroBitValue);
-            if(OutputRmtConfig_t::DataDirection_t::MSB2LSB == OutputRmtConfig.DataDirection)
-            {
+
+            if (OutputRmtConfig_t::DataDirection_t::MSB2LSB == OutputRmtConfig.DataDirection)
                 bitmask >>= 1;
-            }
             else
-            {
                 bitmask <<= 1;
-            }
-#ifdef USE_RMT_DEBUG_COUNTERS
-            if (IntensityValue & bitmask)
-            {
-                BitTypeCounters[int(RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID)]++;
-            }
-            else
-            {
-                BitTypeCounters[int(RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID)]++;
-            }
-#endif // def USE_RMT_DEBUG_COUNTERS
-        } // end send one intensity value
+        }
 
         if (OutputRmtConfig.SendEndOfFrameBits && !ThereIsDataToSend)
         {
             ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_END_OF_FRAME].val);
-            RMT_DEBUG_COUNTER(BitTypeCounters[int(RmtDataBitIdType_t::RMT_END_OF_FRAME)]++);
         }
         else if (OutputRmtConfig.SendInterIntensityBits)
         {
             ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_STOP_START_BIT_ID].val);
-            RMT_DEBUG_COUNTER(BitTypeCounters[int(RmtDataBitIdType_t::RMT_STOP_START_BIT_ID)]++);
         }
 
-        // recalc how much space is still in the buffer.
         NumAvailableBufferSlotsToFill = (NUM_RMT_SLOTS - 1) - NumUsedEntriesInSendBuffer;
-    } // end while there is space in the buffer
+    }
 } // ISR_Handler_SendIntensityData
 
 //----------------------------------------------------------------------------
@@ -493,141 +475,50 @@ bool c_OutputRmt::StartNewFrame ()
 {
     bool Response = false;
 
-    do // once
-    {
-        if(OutputIsPaused)
-        {
-            break;
-        }
+    do {
+        if (OutputIsPaused) break;
 
-        if(InterrupsAreEnabled)
-        {
-            RMT_DEBUG_COUNTER(IncompleteFrame++);
-        }
+        ISR_ResetRmtBlockPointers();
+        ISR_StartNewDataFrame();
 
-        // reset our indices
-        ISR_ResetRmtBlockPointers ();
+        for (uint32_t i = 0; i < OutputRmtConfig.NumIdleBits; i++)
+            ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID].val);
 
-        // build inter-frame gap
-        uint32_t NumInterFrameRmtSlotsCount = 0;
-        while (NumInterFrameRmtSlotsCount < OutputRmtConfig.NumIdleBits)
-        {
-            ISR_WriteToBuffer (Intensity2Rmt[RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID].val);
-            ++NumInterFrameRmtSlotsCount;
-            RMT_DEBUG_COUNTER(BitTypeCounters[int(RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID)]++);
-        }
+        for (uint32_t i = 0; i < OutputRmtConfig.NumFrameStartBits; i++)
+            ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_STARTBIT_ID].val);
 
-        // frame start bits
-        uint32_t NumFrameStartRmtSlotsCount = 0;
-        while (NumFrameStartRmtSlotsCount++ < OutputRmtConfig.NumFrameStartBits)
-        {
-            ISR_WriteToBuffer (Intensity2Rmt[RmtDataBitIdType_t::RMT_STARTBIT_ID].val);
-            RMT_DEBUG_COUNTER(BitTypeCounters[int(RmtDataBitIdType_t::RMT_STARTBIT_ID)]++);
-        }
-
-#ifdef USE_RMT_DEBUG_COUNTERS
-        FrameStartCounter++;
-        IntensityValuesSentLastFrame = IntensityValuesSent;
-        IntensityValuesSent          = 0;
-        IntensityBitsSentLastFrame   = IntensityBitsSent;
-        IntensityBitsSent            = 0;
-#endif // def USE_RMT_DEBUG_COUNTERS
-
-        // set up to send a new frame
-        ISR_StartNewDataFrame ();
-
-        // create initial data
         ThereIsDataToSend = ISR_MoreDataToSend();
         ISR_CreateIntensityData();
 
-        // refill if needed
-        ISR_CreateIntensityData();
-
-        // Collect SendBuffer entries into a contiguous array for rmt_write_items()
         std::vector<rmt_item32_t> tx_items;
-        tx_items.reserve(NumUsedEntriesInSendBuffer + 8);
+        tx_items.reserve(NumUsedEntriesInSendBuffer + 1);
 
-        // drain current buffer first, then generate more until no more data
-        while(true)
+        while (NumUsedEntriesInSendBuffer)
         {
-            // move available SendBuffer items to tx_items
-            while(NumUsedEntriesInSendBuffer)
-            {
-                rmt_item32_t &it = SendBuffer[SendBufferReadIndex];
-                tx_items.push_back(it);
-
-                SendBufferReadIndex = (SendBufferReadIndex + 1) & (NUM_RMT_SLOTS - 1);
-                --NumUsedEntriesInSendBuffer;
-            }
-
-            // if we still have data upstream, ask for more and create it
-            if (ISR_MoreDataToSend())
-            {
-                ThereIsDataToSend = true;
-                ISR_CreateIntensityData();
-                // loop to drain newly created entries
-            }
-            else
-            {
-                // no more data to append
-                ThereIsDataToSend = false;
-                break;
-            }
+            tx_items.push_back(SendBuffer[SendBufferReadIndex]);
+            SendBufferReadIndex = (SendBufferReadIndex + 1) & (NUM_RMT_SLOTS - 1);
+            --NumUsedEntriesInSendBuffer;
         }
 
-        // ensure termination value like original (0)
         rmt_item32_t terminator;
         terminator.val = 0;
         tx_items.push_back(terminator);
 
-        // Copy into heap memory because rmt_write_items may use the buffer asynchronously.
         size_t count = tx_items.size();
-        rmt_item32_t * heap_items = (rmt_item32_t*)malloc(count * sizeof(rmt_item32_t));
-        if(!heap_items)
-        {
-            logcon(String(CN_stars) + F(" ERROR: malloc failed for RMT items") + CN_stars);
-            break;
-        }
+        rmt_item32_t* heap_items = (rmt_item32_t*)malloc(count * sizeof(rmt_item32_t));
+        if (!heap_items) break;
+
         memcpy(heap_items, tx_items.data(), count * sizeof(rmt_item32_t));
 
-        // Start non-blocking transmit: write items and return immediately.
-        int ch = OutputRmtConfig.RmtChannelId;
-        esp_err_t err = rmt_write_items((rmt_channel_t)ch, heap_items, count, false); // non-blocking
-        if (err != ESP_OK)
-        {
-            logcon(String(CN_stars) + F(" ERROR: rmt_write_items failed") + CN_stars);
-            free(heap_items);
-            break;
-        }
-
-        // create a watcher param to free buffer and notify when done
-        TransmitWatcherParam * p = (TransmitWatcherParam*)malloc(sizeof(TransmitWatcherParam));
-        if(!p)
-        {
-            logcon(String(CN_stars) + F(" ERROR: malloc failed for watcher param") + CN_stars);
-            // If we cannot create watcher, at least wait here (blocking) and then free
-            rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
-            free(heap_items);
-            break;
-        }
-        p->channel = ch;
-        p->items = heap_items;
-        p->count = count;
-
-        // Wait synchronously for TX completion (no extra task → no heap use)
-		rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
-		free(heap_items);
-		free(p);
-
-		// notify SendFrameTaskHandle to keep timing identical
-		if (SendFrameTaskHandle) {
-			vTaskNotifyGiveFromISR(SendFrameTaskHandle, &xHigherPriorityTaskWoken);
-		}
+        esp_err_t err = rmt_write_items((rmt_channel_t)OutputRmtConfig.RmtChannelId, heap_items, count, true);
+        free(heap_items);
+        if (err != ESP_OK) break;
 
         Response = true;
     } while(false);
 
     return Response;
-} // StartNewFrame
+}
+ // StartNewFrame
 
 #endif // def ARDUINO_ARCH_ESP32

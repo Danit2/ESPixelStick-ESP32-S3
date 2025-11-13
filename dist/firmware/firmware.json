@@ -33,7 +33,7 @@
             "filesystem": {
                 "page": "256",
                 "block": "4096",
-                "size": "0x450000",
+                "size": "0x50000",
                 "offset": "0x3B0000"
             }
         }
