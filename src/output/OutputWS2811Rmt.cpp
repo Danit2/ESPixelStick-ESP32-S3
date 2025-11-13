@@ -16,7 +16,6 @@
 *  or use of these programs.
 *
 */
-#include "driver/gpio.h"
 #include "ESPixelStick.h"
 #if defined(SUPPORT_OutputType_WS2811) && defined(ARDUINO_ARCH_ESP32)
 
@@ -25,9 +24,9 @@
 // The adjustments compensate for rounding errors in the calculations
 #define WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_0_HIGH / RMT_TickLengthNS) + 0.0)
 #define WS2811_PIXEL_RMT_TICKS_BIT_0_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_0_LOW  / RMT_TickLengthNS) + 0.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS) - 0.0)
-#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 0.0)
-#define WS2811_PIXEL_RMT_TICKS_IDLE          uint16_t ( (WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 0.0)
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH    uint16_t ( (WS2811_PIXEL_NS_BIT_1_HIGH / RMT_TickLengthNS) - 1.0)
+#define WS2811_PIXEL_RMT_TICKS_BIT_1_LOW     uint16_t ( (WS2811_PIXEL_NS_BIT_1_LOW  / RMT_TickLengthNS) + 1.0)
+#define WS2811_PIXEL_RMT_TICKS_IDLE          uint16_t ( (WS2811_PIXEL_IDLE_TIME_NS  / RMT_TickLengthNS) + 1.0)
 
 static const c_OutputRmt::ConvertIntensityToRmtDataStreamEntry_t ConvertIntensityToRmtDataStream[] =
 {
@@ -71,43 +70,8 @@ c_OutputWS2811Rmt::~c_OutputWS2811Rmt ()
 //----------------------------------------------------------------------------
 /* Use the current config to set up the output port
 */
-void c_OutputWS2811Rmt::Begin()
+void c_OutputWS2811Rmt::Begin ()
 {
-    c_OutputWS2811::Begin();
-
-    // --- Pin vorbereiten ---
-    bool pinIsValid = false;
-#if defined(gpio_is_valid_gpio_num)
-    pinIsValid = gpio_is_valid_gpio_num((gpio_num_t)DataPin);
-#elif defined(gpio_is_valid)
-    pinIsValid = gpio_is_valid((gpio_num_t)DataPin);
-#else
-    // Fallback: einfache Bereichsprüfung
-    pinIsValid = (DataPin >= 0 && DataPin <= GPIO_NUM_MAX);
-#endif
-
-    if (pinIsValid) {
-        gpio_set_direction((gpio_num_t)DataPin, GPIO_MODE_OUTPUT);
-        gpio_set_level((gpio_num_t)DataPin, 0);
-        gpio_set_pull_mode((gpio_num_t)DataPin, GPIO_FLOATING);
-
-        esp_err_t err = gpio_set_drive_capability((gpio_num_t)DataPin, GPIO_DRIVE_CAP_3);
-        if (err != ESP_OK) {
-            logcon(String("[WARN] gpio_set_drive_capability failed on pin ")
-                 + String(DataPin) + " (code " + String(err) + ")");
-        }
-    } else {
-        logcon(String("[WARN] Invalid GPIO for WS2811 output: ") + String(DataPin));
-    }
-
-    // --- RMT Idle-Level korrekt setzen ---
-    rmt_channel_t channel = (rmt_channel_t)OutputChannelId;
-    esp_err_t rmtErr = rmt_set_idle_level(channel, true, RMT_IDLE_LEVEL_LOW);
-    if (rmtErr != ESP_OK) {
-        logcon(String("[WARN] rmt_set_idle_level failed on channel ")
-             + String(channel) + " (code " + String(rmtErr) + ")");
-    }
-
     // ======================================================
     //   Diagnose-Log für WS2811 / WS2812 Timing
     // ======================================================
@@ -130,8 +94,16 @@ void c_OutputWS2811Rmt::Begin()
     }
 #endif
 
+    // DEBUG_START;
+
+    c_OutputWS2811::Begin ();
+
+    // DEBUG_V (String ("DataPin: ") + String (DataPin));
+
     HasBeenInitialized = true;
-	
+
+    // DEBUG_END;
+
 } // Begin
 
 //----------------------------------------------------------------------------
