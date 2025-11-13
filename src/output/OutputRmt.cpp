@@ -573,3 +573,5 @@ bool c_OutputRmt::StartNewFrame()
 
     return Response;
 } // StartNewFrame
+
+#endif // def ARDUINO_ARCH_ESP32
