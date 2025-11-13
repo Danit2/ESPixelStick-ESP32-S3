@@ -473,7 +473,6 @@ inline void IRAM_ATTR c_OutputRmt::ISR_WriteToBuffer(uint32_t value)
     if (NumUsedEntriesInSendBuffer >= (NUM_RMT_SLOTS - 1))
     {
         ++NumRmtSlotOverruns;
-        RanOutOfData = true;
         return;
     }
 
