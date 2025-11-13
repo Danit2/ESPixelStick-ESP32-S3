@@ -354,6 +354,14 @@ void IRAM_ATTR c_OutputRmt::ISR_CreateIntensityData ()
         // convert the intensity data into RMT slot data
         uint32_t bitmask = TxIntensityDataStartingMask;
         for (uint32_t BitCount = OutputRmtConfig.IntensityDataWidth; BitCount > 0; --BitCount)
+		
+		if (IntensityValuesSent < 10) {
+			logcon(String("[BITDBG] LED#") + String(IntensityValuesSent) +
+				" Intensity=" + String(IntensityValue, HEX) +
+				" Width=" + String(OutputRmtConfig.IntensityDataWidth));
+		}
+
+		
         {
             RMT_DEBUG_COUNTER(IntensityBitsSent++);
             bool bitSet = (0 != (IntensityValue & bitmask));
