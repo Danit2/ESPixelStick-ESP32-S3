@@ -335,40 +335,60 @@ void IRAM_ATTR c_OutputRmt::ISR_CreateIntensityData ()
     const uint32_t ZeroBitValue = Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID].val;
 
     uint32_t IntensityValue;
-    uint32_t NumAvailableBufferSlotsToFill = NUM_RMT_SLOTS - NumUsedEntriesInSendBuffer;
+    uint32_t NumAvailableBufferSlotsToFill = (NUM_RMT_SLOTS - 1) - NumUsedEntriesInSendBuffer;
 
     while ((NumAvailableBufferSlotsToFill > NumRmtSlotsPerIntensityValue) && ThereIsDataToSend)
     {
         ThereIsDataToSend = ISR_GetNextIntensityToSend(IntensityValue);
+		
+		#ifdef DEBUG_RMT_BITS
+			logcon(String("IntensityVal=0x") + String(IntensityValue, HEX) + " maskStart=0x" + String(TxIntensityDataStartingMask, HEX));
+		#endif
+		
         RMT_DEBUG_COUNTER(IntensityValuesSent++);
 
-        // logcon(String("Pixel intensity: ") + String(IntensityValue));
+#ifdef USE_RMT_DEBUG_COUNTERS
+        if (200 < IntensityValue) { ++RmtWhiteDetected; }
+#endif
 
+        // convert the intensity data into RMT slot data
         uint32_t bitmask = TxIntensityDataStartingMask;
-
         for (uint32_t BitCount = OutputRmtConfig.IntensityDataWidth; BitCount > 0; --BitCount)
         {
-            bool bitSet = (IntensityValue & bitmask);
-            ISR_WriteToBuffer(bitSet ? OneBitValue : ZeroBitValue);
             RMT_DEBUG_COUNTER(IntensityBitsSent++);
+            bool bitSet = (0 != (IntensityValue & bitmask));
+            ISR_WriteToBuffer(bitSet ? OneBitValue : ZeroBitValue);
 
             if (OutputRmtConfig_t::DataDirection_t::MSB2LSB == OutputRmtConfig.DataDirection)
+            {
                 bitmask >>= 1;
+            }
             else
+            {
                 bitmask <<= 1;
-        }
+            }
+
+#ifdef USE_RMT_DEBUG_COUNTERS
+            if (bitSet)
+                BitTypeCounters[int(RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID)]++;
+            else
+                BitTypeCounters[int(RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID)]++;
+#endif
+        } // end send one intensity value
 
         if (OutputRmtConfig.SendEndOfFrameBits && !ThereIsDataToSend)
         {
             ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_END_OF_FRAME].val);
+            RMT_DEBUG_COUNTER(BitTypeCounters[int(RmtDataBitIdType_t::RMT_END_OF_FRAME)]++);
         }
         else if (OutputRmtConfig.SendInterIntensityBits)
         {
             ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_STOP_START_BIT_ID].val);
+            RMT_DEBUG_COUNTER(BitTypeCounters[int(RmtDataBitIdType_t::RMT_STOP_START_BIT_ID)]++);
         }
 
         NumAvailableBufferSlotsToFill = (NUM_RMT_SLOTS - 1) - NumUsedEntriesInSendBuffer;
-    }
+    } // end while there is space in the buffer
 } // ISR_Handler_SendIntensityData
 
 //----------------------------------------------------------------------------
@@ -450,8 +470,15 @@ void IRAM_ATTR c_OutputRmt::ISR_TransferIntensityDataToRMT (uint32_t MaxNumEntri
 //----------------------------------------------------------------------------
 inline void IRAM_ATTR c_OutputRmt::ISR_WriteToBuffer(uint32_t value)
 {
-    SendBuffer[SendBufferWriteIndex++].val = value;
-    SendBufferWriteIndex &= uint32_t(NUM_RMT_SLOTS - 1);
+    if (NumUsedEntriesInSendBuffer >= (NUM_RMT_SLOTS - 1))
+    {
+        ++NumRmtSlotOverruns;
+        RanOutOfData = true;
+        return;
+    }
+
+    SendBuffer[SendBufferWriteIndex].val = value;
+    SendBufferWriteIndex = (SendBufferWriteIndex + 1) & (NUM_RMT_SLOTS - 1);
     ++NumUsedEntriesInSendBuffer;
 }
 
@@ -587,7 +614,7 @@ bool c_OutputRmt::StartNewFrame ()
         if(!p)
         {
             logcon(String(CN_stars) + F(" ERROR: malloc failed for watcher param") + CN_stars);
-            // If we cannot create watcher, at least wait here (blocking) and then free
+            // Fallback: wait here (blocking) and then free
             rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
             free(heap_items);
             break;
@@ -596,16 +623,27 @@ bool c_OutputRmt::StartNewFrame ()
         p->items = heap_items;
         p->count = count;
 
-        // Wait synchronously for TX completion (no extra task → no heap use)
-		rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
-		free(heap_items);
-		free(p);
+        // Start the watcher task which will wait for TX complete, free heap_items and notify SendFrameTaskHandle
+        BaseType_t xReturned = xTaskCreatePinnedToCore(
+            TransmitWatcherTask,
+            "RMT_TxWatch",
+            3072,
+            (void*)p,
+            5,
+            NULL,
+            1
+        );
+        if (xReturned != pdPASS)
+        {
+            // If we couldn't start the watcher, fallback to blocking wait here and free.
+            logcon(String(CN_stars) + F(" WARN: Failed to create TransmitWatcherTask, blocking and freeing buffer") + CN_stars);
+            rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
+            free(heap_items);
+            free(p);
+            break;
+        }
 
-		// notify SendFrameTaskHandle to keep timing identical
-		if (SendFrameTaskHandle) {
-			vTaskNotifyGiveFromISR(SendFrameTaskHandle, &xHigherPriorityTaskWoken);
-		}
-
+        // Response set true below after successful queuing
         Response = true;
     } while(false);
 
