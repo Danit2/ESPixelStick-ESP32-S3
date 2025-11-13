@@ -54,7 +54,7 @@ public:
     {
         rmt_channel_t       RmtChannelId           = rmt_channel_t(-1);
         gpio_num_t          DataPin                = gpio_num_t(-1);
-        rmt_idle_level_t    idle_level             = rmt_idle_level_t::RMT_IDLE_LEVEL_HIGH;
+        rmt_idle_level_t    idle_level             = rmt_idle_level_t::RMT_IDLE_LEVEL_LOW;
         uint32_t            IntensityDataWidth     = 8;
         bool                SendInterIntensityBits = false;
         bool                SendEndOfFrameBits     = false;
@@ -146,9 +146,6 @@ public:
 #define RMT_ClockRate       80000000.0
 #define RMT_Clock_Divisor   2.0
 #define RMT_TickLengthNS    float ( (1/ (RMT_ClockRate/RMT_Clock_Divisor)) * float(NanoSecondsInASecond))
-
-#define RMT_TickLengthNS float( (1.0 / (RMT_ClockRate / RMT_Clock_Divisor)) * float(NanoSecondsInASecond) )
-
 
     void UpdateBitXlatTable(const CitrdsArray_t * CitrdsArray);
     bool ValidateBitXlatTable(const CitrdsArray_t * CitrdsArray);

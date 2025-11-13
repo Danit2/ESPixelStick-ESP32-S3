@@ -72,28 +72,6 @@ c_OutputWS2811Rmt::~c_OutputWS2811Rmt ()
 */
 void c_OutputWS2811Rmt::Begin ()
 {
-    // ======================================================
-    //   Diagnose-Log für WS2811 / WS2812 Timing
-    // ======================================================
-#if defined(SUPPORT_OutputType_WS2811)
-    {
-        float real_T0H_ns = WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH * RMT_TickLengthNS;
-        float real_T0L_ns = WS2811_PIXEL_RMT_TICKS_BIT_0_LOW  * RMT_TickLengthNS;
-        float real_T1H_ns = WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH * RMT_TickLengthNS;
-        float real_T1L_ns = WS2811_PIXEL_RMT_TICKS_BIT_1_LOW  * RMT_TickLengthNS;
-        float real_Tbit_ns = real_T0H_ns + real_T0L_ns;
-        float real_Reset_us = (WS2811_PIXEL_RMT_TICKS_IDLE * RMT_TickLengthNS) / 1000.0;
-
-        logcon(String("[WS281x Timing] Tick=") + String(RMT_TickLengthNS, 2) + "ns  " +
-               "T0H=" + String(real_T0H_ns, 0) + "ns  " +
-               "T0L=" + String(real_T0L_ns, 0) + "ns  " +
-               "T1H=" + String(real_T1H_ns, 0) + "ns  " +
-               "T1L=" + String(real_T1L_ns, 0) + "ns  " +
-               "Bit=" + String(real_Tbit_ns / 1000.0, 2) + "µs  " +
-               "Reset=" + String(real_Reset_us, 1) + "µs");
-    }
-#endif
-
     // DEBUG_START;
 
     c_OutputWS2811::Begin ();
@@ -115,13 +93,6 @@ bool c_OutputWS2811Rmt::SetConfig (ArduinoJson::JsonObject& jsonConfig)
 
     uint32_t ifgNS = (InterFrameGapInMicroSec * NanoSecondsInAMicroSecond);
     uint32_t ifgTicks = ifgNS / RMT_TickLengthNS;
-	
-	logcon(String("RMT_TickLengthNS=") + String(RMT_TickLengthNS) +
-       " ifgTicks=" + String(ifgTicks) +
-       " T0H=" + String(WS2811_PIXEL_RMT_TICKS_BIT_0_HIGH) +
-       " T0L=" + String(WS2811_PIXEL_RMT_TICKS_BIT_0_LOW) +
-       " T1H=" + String(WS2811_PIXEL_RMT_TICKS_BIT_1_HIGH) +
-       " T1L=" + String(WS2811_PIXEL_RMT_TICKS_BIT_1_LOW));
 
     // Default is 100us * 3
     rmt_item32_t BitValue;
