@@ -609,29 +609,19 @@ bool c_OutputRmt::StartNewFrame ()
         }
 
         // create a watcher param to free buffer and notify when done
-        TransmitWatcherParam * p = (TransmitWatcherParam*)malloc(sizeof(TransmitWatcherParam));
-        if(!p)
-        {
-            logcon(String(CN_stars) + F(" ERROR: malloc failed for watcher param") + CN_stars);
-            // Fallback: wait here (blocking) and then free
-            rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
-            free(heap_items);
-            break;
-        }
-        p->channel = ch;
-        p->items = heap_items;
-        p->count = count;
+		int ch = OutputRmtConfig.RmtChannelId;
+		esp_err_t err = rmt_write_items((rmt_channel_t)ch, heap_items, count, true); // true = blocking
+		if (err != ESP_OK) {
+			logcon(String(CN_stars) + F(" ERROR: rmt_write_items failed") + CN_stars);
+		}
+		free(heap_items);
 
-        // Start the watcher task which will wait for TX complete, free heap_items and notify SendFrameTaskHandle
-        BaseType_t xReturned = xTaskCreatePinnedToCore(
-            TransmitWatcherTask,
-            "RMT_TxWatch",
-            3072,
-            (void*)p,
-            5,
-            NULL,
-            1
-        );
+		if (SendFrameTaskHandle) {
+			xTaskNotifyGive(SendFrameTaskHandle);
+		}
+
+		Response = (err == ESP_OK);
+
         if (xReturned != pdPASS)
         {
             // If we couldn't start the watcher, fallback to blocking wait here and free.
