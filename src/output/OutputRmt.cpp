@@ -178,23 +178,6 @@ void c_OutputRmt::Begin (OutputRmtConfig_t config, c_OutputCommon * _pParent )
 		{
 			rmt_channel_t ch = (rmt_channel_t)OutputRmtConfig.RmtChannelId;
 
-			// Ensure idle output is enabled and set to desired level (IDF signature: channel, idle_out_en, level)
-			esp_err_t rml = rmt_set_idle_level(ch, true, OutputRmtConfig.idle_level);
-			if (rml != ESP_OK) {
-				logcon(String("[WARN] rmt_set_idle_level failed for ch ") + String(ch) + " (" + String(rml) + ")");
-			}
-
-			// Make sure TX loop is disabled (some configs set loop_en accidentally)
-			// Ensure TX loop is disabled (IDF4 vs IDF5 naming)
-			#if defined(rmt_set_tx_loop_mode)
-				rmt_set_tx_loop_mode(ch, false);
-			#elif defined(rmt_set_tx_loop)
-				rmt_set_tx_loop(ch, false);
-			#else
-				// not available — ignore safely
-			#endif
-
-
 			// Small sanity log per channel (shows tick length macro + pin)
 			logcon(String("[RMT] Init Channel ") + String(OutputRmtConfig.RmtChannelId) +
 				" Pin=" + String(OutputRmtConfig.DataPin) +
