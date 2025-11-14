@@ -7,6 +7,8 @@
 *
 * Adapted to use IDF4-style RMT function API (driver/rmt.h) so it compiles with
 * platform-espressif32 @ 6.12.0 and runs on ESP32-S3 without direct register access.
+*
+* UPDATED: Non-blocking RMT output with watcher task and reduced realloc jitter.
 */
 #include "ESPixelStick.h"
 #ifdef ARDUINO_ARCH_ESP32
@@ -26,11 +28,10 @@ static uint32_t RawIsrCounter = 0;
 #endif // def USE_RMT_DEBUG_COUNTERS
 
 static TaskHandle_t SendFrameTaskHandle = NULL;
-static BaseType_t xHigherPriorityTaskWoken = pdTRUE;
 static uint32_t FrameCompletes = 0;
 static uint32_t FrameTimeouts = 0;
 
-// small struct passed to watcher task (not used in blocking mode but kept for compatibility)
+// small struct passed to watcher task
 struct TransmitWatcherParam {
     int channel;
     rmt_item32_t * items;
@@ -42,13 +43,17 @@ static void TransmitWatcherTask(void * arg)
 {
     TransmitWatcherParam * p = (TransmitWatcherParam*)arg;
     int ch = p->channel;
-    // wait until the RMT transmitter finishes for this channel
+
+    // wait until the RMT transmitter finishes for this channel (blocking in watcher task)
     rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
+
     // notify the sendframe task that the transmission finished (to mimic original behavior)
     if (SendFrameTaskHandle)
     {
-        vTaskNotifyGiveFromISR(SendFrameTaskHandle, &xHigherPriorityTaskWoken);
+        // We're in a task context, so use the task API (not the ISR variant)
+        xTaskNotifyGive(SendFrameTaskHandle);
     }
+
     // free the items memory
     free(p->items);
     free(p);
@@ -56,14 +61,15 @@ static void TransmitWatcherTask(void * arg)
 }
 
 //----------------------------------------------------------------------------
-// Simple send task that polls all channels and triggers StartNewFrame()
+// Simple send task that polls all channels and triggers StartNextFrame()
 void RMT_Task(void *arg)
 {
     (void)arg;
     while (1)
     {
-        // Give the outputs a chance to catch up.
-        delay(1);
+        // yield a bit to other tasks but allow low latency
+        vTaskDelay(pdMS_TO_TICKS(1));
+
         // process all possible channels
         for (c_OutputRmt * pRmt : rmt_isr_ThisPtrs)
         {
@@ -74,7 +80,8 @@ void RMT_Task(void *arg)
                 if (pRmt->StartNextFrame())
                 {
                     // wait for notification that the frame finished (emulates old behavior)
-                    uint32_t NotificationValue = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100));
+                    // use an indefinite wait to avoid spurious timeouts
+                    uint32_t NotificationValue = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
                     if (1 == NotificationValue)
                     {
                         ++FrameCompletes;
@@ -306,11 +313,6 @@ void c_OutputRmt::GetStatus(ArduinoJson::JsonObject& jsonStatus)
 // (Legacy) ISR_CreateIntensityData kept for API compatibility but not used by StartNewFrame
 void IRAM_ATTR c_OutputRmt::ISR_CreateIntensityData()
 {
-    // For compatibility with original code we keep this function but do not
-    // rely on it in the new StartNewFrame() path. It can be left empty or
-    // used for alternative non-blocking flows.
-    // We'll log entry for debugging if needed.
-    // logcon(String("[RMTDBG] ISR_CreateIntensityData invoked (legacy no-op)"));
     (void)0;
 }
 
@@ -321,15 +323,12 @@ inline bool IRAM_ATTR c_OutputRmt::ISR_GetNextIntensityToSend(uint32_t &DataToSe
     if (nullptr != OutputRmtConfig.pPixelDataSource)
     {
         bool more = OutputRmtConfig.pPixelDataSource->ISR_GetNextIntensityToSend(DataToSend);
-        // minimal debug
-        // logcon(String("[RMTDBG] ISR_GetNextIntensityToSend pixel returned 0x") + String(DataToSend, HEX) + " more=" + String(more));
         return more;
     }
 #if defined(SUPPORT_OutputType_DMX) || defined(SUPPORT_OutputType_Serial) || defined(SUPPORT_OutputType_Renard)
     else
     {
         bool more = OutputRmtConfig.pSerialDataSource->ISR_GetNextIntensityToSend(DataToSend);
-        // logcon(String("[RMTDBG] ISR_GetNextIntensityToSend serial returned 0x") + String(DataToSend, HEX) + " more=" + String(more));
         return more;
     }
 #else
@@ -397,14 +396,11 @@ void IRAM_ATTR c_OutputRmt::ISR_TransferIntensityDataToRMT(uint32_t MaxNumEntrie
 
 //----------------------------------------------------------------------------
 // ISR_WriteToBuffer kept for compatibility (writes into legacy SendBuffer)
-// Not used by StartNewFrame path, but retained to avoid breaking other code.
 inline void IRAM_ATTR c_OutputRmt::ISR_WriteToBuffer(uint32_t value)
 {
-    // Schütze gegen Überlauf: behalte Platz für Terminator (-1) und eine kleine Reserve
     if (NumUsedEntriesInSendBuffer >= (NUM_RMT_SLOTS - 2))
     {
         ++NumRmtSlotOverruns;
-        // Verwerfen ist besser als Überschreiben. Hinweis setzen für Debug.
         return;
     }
 
@@ -430,7 +426,7 @@ void c_OutputRmt::PauseOutput(bool PauseOutput)
 } // PauseOutput
 
 //----------------------------------------------------------------------------
-// StartNewFrame - build frame in a linear vector and call rmt_write_items (blocking)
+// StartNewFrame - build frame in a linear vector and call rmt_write_items (non-blocking)
 bool c_OutputRmt::StartNewFrame()
 {
     bool ok = true;
@@ -453,7 +449,23 @@ bool c_OutputRmt::StartNewFrame()
 
         // Prepare linear container for rmt items for this frame
         std::vector<rmt_item32_t> items;
-        items.reserve(256); // growable; reserve a small amount to start
+        // reserve a larger initial capacity to avoid repeated reallocations for typical strips
+        // Dynamische Reservierung basierend auf Pixelanzahl
+        uint32_t est_items = 0;
+        if (OutputRmtConfig.pPixelDataSource) {
+            uint32_t numPixels = OutputRmtConfig.pPixelDataSource->GetNumOutputBufferPixels();
+            uint32_t bitsPerPixel = OutputRmtConfig.IntensityDataWidth;
+            est_items = numPixels * bitsPerPixel;
+        }
+        // Frame-Overhead hinzuaddieren
+        est_items += OutputRmtConfig.NumIdleBits
+                   + OutputRmtConfig.NumFrameStartBits
+                   + OutputRmtConfig.NumFrameStopBits
+                   + 64; // Sicherheitsreserve
+
+        // Mindestgröße
+        if (est_items < 256) est_items = 256;
+        items.reserve(est_items);
 
         // 1) Inter-frame gap (idle bits)
         for (uint32_t i = 0; i < OutputRmtConfig.NumIdleBits; ++i)
@@ -532,8 +544,7 @@ bool c_OutputRmt::StartNewFrame()
                 break;
             }
 
-            // small safety: avoid too huge allocations; allow loop to keep pushing
-            // vector will grow as needed.
+            // small safety: vector will grow as needed
         } // while more data
 
         // 4) Frame stop bits (reset time)
@@ -553,7 +564,7 @@ bool c_OutputRmt::StartNewFrame()
                 " items generated -> check ISR_MoreDataToSend()");
         }
 
-        // Copy into heap memory because rmt_write_items may use the buffer synchronously/asynchronously.
+        // Copy into heap memory because rmt_write_items will be non-blocking.
         size_t count = items.size();
         rmt_item32_t* heap_items = (rmt_item32_t*)malloc(count * sizeof(rmt_item32_t));
         if (!heap_items)
@@ -564,19 +575,44 @@ bool c_OutputRmt::StartNewFrame()
         }
         memcpy(heap_items, items.data(), count * sizeof(rmt_item32_t));
 
-        // BLOCKING send - simpler and stable for our use-case
+        // NON-BLOCKING send - allow multiple channels to run in parallel and avoid frame-level blocking
         esp_err_t e = rmt_write_items(
             (rmt_channel_t)OutputRmtConfig.RmtChannelId,
             heap_items,
             count,
-            true
+            false // non-blocking
         );
-
-        free(heap_items);
 
         if (e != ESP_OK)
         {
             logcon("[RMT] ERROR rmt_write_items failed");
+            free(heap_items);
+            ok = false;
+            break;
+        }
+
+        // spawn watcher task to free heap items and notify main send task when done
+        TransmitWatcherParam * param = (TransmitWatcherParam*)malloc(sizeof(TransmitWatcherParam));
+        if (!param)
+        {
+            // if we can't allocate a watcher, free memory and treat as error
+            free(heap_items);
+            logcon("[RMT] ERROR: malloc failed for TransmitWatcherParam");
+            ok = false;
+            break;
+        }
+        param->channel = (int)OutputRmtConfig.RmtChannelId;
+        param->items = heap_items;
+        param->count = count;
+
+        // create watcher task - let it run on the same core as RMT_Task to avoid cross-core issues
+        BaseType_t rc = xTaskCreatePinnedToCore(TransmitWatcherTask, "RMTWatcher", 2048, param, 5, NULL, 1);
+        if (rc != pdPASS)
+        {
+            // if we couldn't create a watcher task, clean up and report error
+            free(heap_items);
+            free(param);
+            logcon("[RMT] ERROR: failed to create TransmitWatcherTask");
             ok = false;
             break;
         }
