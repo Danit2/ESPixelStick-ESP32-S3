@@ -203,7 +203,7 @@ void c_OutputRmt::Begin(OutputRmtConfig_t config, c_OutputCommon * _pParent)
             ESP_ERROR_CHECK(rmt_set_source_clk(OutputRmtConfig.RmtChannelId, RMT_BASECLK_APB));
         #endif
 
-        // reset the internal indices & buffer counters
+        // reset the internal indices & buffer counters (kept for compatibility; not used)
         ISR_ResetRmtBlockPointers();
         memset((void*)&SendBuffer[0], 0x0, sizeof(SendBuffer));
 
@@ -317,82 +317,34 @@ void c_OutputRmt::GetStatus(ArduinoJson::JsonObject& jsonStatus)
 } // GetStatus
 
 //----------------------------------------------------------------------------
-// ISR_CreateIntensityData - convert intensity bytes into RMT items (Option B)
+// (Legacy) ISR_CreateIntensityData kept for API compatibility but not used by StartNewFrame
 void IRAM_ATTR c_OutputRmt::ISR_CreateIntensityData()
 {
-    // Solange noch Platz im Buffer (reserve für Terminator) und noch Daten
-    while (NumUsedEntriesInSendBuffer < (NUM_RMT_SLOTS - 4))
-    {
-        uint32_t intensityByte = 0;
-
-        // ISR_GetNextIntensityToSend liefert das Byte und als Rückgabewert, ob danach noch Daten sind.
-        bool moreAfter = ISR_GetNextIntensityToSend(intensityByte);
-
-        // Sende das gerade gelesene Byte IMMER (auch wenn moreAfter == false)
-        uint32_t mask;
-        if (OutputRmtConfig.DataDirection == OutputRmtConfig_t::DataDirection_t::MSB2LSB)
-        {
-            mask = 0x80u; // MSB first
-        }
-        else
-        {
-            mask = 0x01u; // LSB first
-        }
-
-        for (uint32_t b = 0; b < OutputRmtConfig.IntensityDataWidth; ++b)
-        {
-            bool isOne;
-            if (OutputRmtConfig.DataDirection == OutputRmtConfig_t::DataDirection_t::MSB2LSB)
-            {
-                isOne = (intensityByte & mask) != 0;
-                mask >>= 1;
-            }
-            else
-            {
-                isOne = (intensityByte & mask) != 0;
-                mask <<= 1;
-            }
-
-            // write the appropriate translation slot
-            ISR_WriteToBuffer(isOne
-                ? Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID].val
-                : Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID].val);
-        }
-
-        // Falls konfiguriert, sende ein InterIntensity-Bit (z. B. separater Stop/Start)
-        if (OutputRmtConfig.SendInterIntensityBits)
-        {
-            ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_STOPBIT_ID].val);
-        }
-
-        // Setze ThereIsDataToSend nach dem Senden des Bytes
-        ThereIsDataToSend = moreAfter;
-
-        // Wenn keine weiteren Daten mehr anstehen, beende das Erzeugen
-        if (!ThereIsDataToSend)
-        {
-            // Optional End-of-frame marker
-            if (OutputRmtConfig.SendEndOfFrameBits)
-            {
-                ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_END_OF_FRAME].val);
-            }
-            break;
-        }
-    } // while buffer has room
-} // ISR_CreateIntensityData
+    // For compatibility with original code we keep this function but do not
+    // rely on it in the new StartNewFrame() path. It can be left empty or
+    // used for alternative non-blocking flows.
+    // We'll log entry for debugging if needed.
+    // logcon(String("[RMTDBG] ISR_CreateIntensityData invoked (legacy no-op)"));
+    (void)0;
+}
 
 //----------------------------------------------------------------------------
-// ISR_GetNextIntensityToSend - delegate to pixel or serial source
+// ISR_GetNextIntensityToSend - delegate to pixel or serial source (kept)
 inline bool IRAM_ATTR c_OutputRmt::ISR_GetNextIntensityToSend(uint32_t &DataToSend)
 {
     if (nullptr != OutputRmtConfig.pPixelDataSource)
     {
-        return OutputRmtConfig.pPixelDataSource->ISR_GetNextIntensityToSend(DataToSend);
+        bool more = OutputRmtConfig.pPixelDataSource->ISR_GetNextIntensityToSend(DataToSend);
+        // minimal debug
+        // logcon(String("[RMTDBG] ISR_GetNextIntensityToSend pixel returned 0x") + String(DataToSend, HEX) + " more=" + String(more));
+        return more;
     }
 #if defined(SUPPORT_OutputType_DMX) || defined(SUPPORT_OutputType_Serial) || defined(SUPPORT_OutputType_Renard)
     else
     {
-        return OutputRmtConfig.pSerialDataSource->ISR_GetNextIntensityToSend(DataToSend);
+        bool more = OutputRmtConfig.pSerialDataSource->ISR_GetNextIntensityToSend(DataToSend);
+        // logcon(String("[RMTDBG] ISR_GetNextIntensityToSend serial returned 0x") + String(DataToSend, HEX) + " more=" + String(more));
+        return more;
     }
 #else
     return false;
@@ -425,10 +377,9 @@ inline bool IRAM_ATTR c_OutputRmt::ISR_MoreDataToSend()
 } // ISR_MoreDataToSend
 
 //----------------------------------------------------------------------------
-// ISR_ResetRmtBlockPointers
+// ISR_ResetRmtBlockPointers (legacy; no ring buffer used anymore)
 inline void IRAM_ATTR c_OutputRmt::ISR_ResetRmtBlockPointers()
 {
-    // No hardware pointer manipulation: just reset the software ring indices
     RmtBufferWriteIndex = 0;
     SendBufferWriteIndex = 0;
     SendBufferReadIndex = 0;
@@ -459,7 +410,8 @@ void IRAM_ATTR c_OutputRmt::ISR_TransferIntensityDataToRMT(uint32_t MaxNumEntrie
 } // ISR_TransferIntensityDataToRMT
 
 //----------------------------------------------------------------------------
-// ISR_WriteToBuffer - safe ring-buffer write
+// ISR_WriteToBuffer kept for compatibility (writes into legacy SendBuffer)
+// Not used by StartNewFrame path, but retained to avoid breaking other code.
 inline void IRAM_ATTR c_OutputRmt::ISR_WriteToBuffer(uint32_t value)
 {
     // Schütze gegen Überlauf: behalte Platz für Terminator (-1) und eine kleine Reserve
@@ -492,7 +444,7 @@ void c_OutputRmt::PauseOutput(bool PauseOutput)
 } // PauseOutput
 
 //----------------------------------------------------------------------------
-// StartNewFrame - build frame, copy to heap and call rmt_write_items (blocking)
+// StartNewFrame - build frame in a linear vector and call rmt_write_items (blocking)
 bool c_OutputRmt::StartNewFrame()
 {
     bool ok = true;
@@ -501,61 +453,110 @@ bool c_OutputRmt::StartNewFrame()
         if (OutputIsPaused)
             break;
 
-        ISR_ResetRmtBlockPointers();
+        // Debug start
+        #ifdef USE_RMT_DEBUG_COUNTERS
+            FrameStartCounter++;
+            IntensityValuesSentLastFrame = IntensityValuesSent;
+            IntensityValuesSent = 0;
+            IntensityBitsSentLastFrame = IntensityBitsSent;
+            IntensityBitsSent = 0;
+        #endif
 
-        //
-        // 1) Interframe-Gap (RESET vom vorherigen Frame)
-        //
-        for (uint32_t i = 0; i < OutputRmtConfig.NumIdleBits; i++)
-            ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID].val);
-
-        //
-        // 2) Frame-Start Bits
-        //
-        for (uint32_t i = 0; i < OutputRmtConfig.NumFrameStartBits; i++)
-            ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_STARTBIT_ID].val);
-
-        //
-        // 3) Start Frame in Pixel/Serial Source
-        //
+        // Ask source to start a new frame
         ISR_StartNewDataFrame();
-        ThereIsDataToSend = ISR_MoreDataToSend();
 
-        //
-        // 4) Pixel-Bits generieren (fills SendBuffer)
-        //
-        ISR_CreateIntensityData();
-
-        //
-        // 5) Optional EndOfFrameBits (user configured marker)
-        //
-        if (OutputRmtConfig.SendEndOfFrameBits)
-        {
-            ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_END_OF_FRAME].val);
-        }
-
-        //
-        // 6) FrameStopBits (WS2812 Resetzeit!)
-        //
-        for (uint32_t i = 0; i < OutputRmtConfig.NumFrameStopBits; i++)
-        {
-            ISR_WriteToBuffer(Intensity2Rmt[RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID].val);
-        }
-
-        //
-        // 7) Copy software ring buffer to contiguous vector
-        //
+        // Prepare linear container for rmt items for this frame
         std::vector<rmt_item32_t> items;
-        items.reserve(NumUsedEntriesInSendBuffer + 8);
+        items.reserve(256); // growable; reserve a small amount to start
 
-        while (NumUsedEntriesInSendBuffer)
+        // 1) Inter-frame gap (idle bits)
+        for (uint32_t i = 0; i < OutputRmtConfig.NumIdleBits; ++i)
         {
-            items.push_back(SendBuffer[SendBufferReadIndex]);
-            SendBufferReadIndex = (SendBufferReadIndex + 1) & (NUM_RMT_SLOTS - 1);
-            NumUsedEntriesInSendBuffer--;
+            items.push_back(Intensity2Rmt[RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID]);
         }
 
-        // Terminator
+        // 2) Frame start bits
+        for (uint32_t i = 0; i < OutputRmtConfig.NumFrameStartBits; ++i)
+        {
+            items.push_back(Intensity2Rmt[RmtDataBitIdType_t::RMT_STARTBIT_ID]);
+        }
+
+        // 3) Pull intensity bytes from the configured source and convert to RMT items
+        bool more = ISR_MoreDataToSend();
+        while (more)
+        {
+            uint32_t intensityByte = 0;
+            // Get next intensity (returns whether there will be more AFTER this byte)
+            bool moreAfter = ISR_GetNextIntensityToSend(intensityByte);
+
+            // Convert this byte into bit items according to DataDirection and IntensityDataWidth
+            uint32_t mask;
+            if (OutputRmtConfig.DataDirection == OutputRmtConfig_t::DataDirection_t::MSB2LSB)
+            {
+                mask = 1u << (OutputRmtConfig.IntensityDataWidth - 1);
+            }
+            else
+            {
+                mask = 1u;
+            }
+
+            for (uint32_t b = 0; b < OutputRmtConfig.IntensityDataWidth; ++b)
+            {
+                bool isOne;
+                if (OutputRmtConfig.DataDirection == OutputRmtConfig_t::DataDirection_t::MSB2LSB)
+                {
+                    isOne = (intensityByte & mask) != 0;
+                    mask >>= 1;
+                }
+                else
+                {
+                    isOne = (intensityByte & mask) != 0;
+                    mask <<= 1;
+                }
+
+                items.push_back(isOne
+                    ? Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID]
+                    : Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID]);
+
+                #ifdef USE_RMT_DEBUG_COUNTERS
+                    IntensityBitsSent++;
+                #endif
+            }
+
+            // optional inter-intensity bit
+            if (OutputRmtConfig.SendInterIntensityBits)
+            {
+                items.push_back(Intensity2Rmt[RmtDataBitIdType_t::RMT_STOPBIT_ID]);
+            }
+
+            // book-keeping
+            #ifdef USE_RMT_DEBUG_COUNTERS
+                IntensityValuesSent++;
+            #endif
+
+            // prepare next iteration
+            more = moreAfter;
+            if (!more)
+            {
+                // If source said no more, optionally append end-of-frame marker
+                if (OutputRmtConfig.SendEndOfFrameBits)
+                {
+                    items.push_back(Intensity2Rmt[RmtDataBitIdType_t::RMT_END_OF_FRAME]);
+                }
+                break;
+            }
+
+            // small safety: avoid too huge allocations; allow loop to keep pushing
+            // vector will grow as needed.
+        } // while more data
+
+        // 4) Frame stop bits (reset time)
+        for (uint32_t i = 0; i < OutputRmtConfig.NumFrameStopBits; ++i)
+        {
+            items.push_back(Intensity2Rmt[RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID]);
+        }
+
+        // Terminator item to keep behavior similar to prior code
         rmt_item32_t endItem;
         endItem.val = 0;
         items.push_back(endItem);
@@ -569,7 +570,7 @@ bool c_OutputRmt::StartNewFrame()
         if (items.size() < 24)
         {
             logcon(String("[RMT] WARNING: only ") + String(items.size()) +
-                   " items generated -> check ISR_MoreDataToSend()");
+                " items generated -> check ISR_MoreDataToSend()");
         }
 
         // Copy into heap memory because rmt_write_items may use the buffer synchronously/asynchronously.
@@ -583,7 +584,7 @@ bool c_OutputRmt::StartNewFrame()
         }
         memcpy(heap_items, items.data(), count * sizeof(rmt_item32_t));
 
-        // BLOCKIEREND senden (stabil)
+        // BLOCKING send - simpler and stable for our use-case
         esp_err_t e = rmt_write_items(
             (rmt_channel_t)OutputRmtConfig.RmtChannelId,
             heap_items,
