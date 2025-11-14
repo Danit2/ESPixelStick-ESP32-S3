@@ -16,6 +16,12 @@
 #include <driver/rmt.h>
 #include <vector>
 #include <cstdlib>
+#include <unordered_map>
+
+// Reusable heap buffers per c_OutputRmt instance to avoid malloc/free on every frame.
+// Keyed by pointer to the instance.
+static std::unordered_map<c_OutputRmt*, rmt_item32_t*> g_reusableBuffers;
+static std::unordered_map<c_OutputRmt*, size_t> g_reusableCapacities;
 
 // forward declaration for the isr handler (not used for register operations anymore)
 static void IRAM_ATTR rmt_intr_handler(void* param) { (void)param; }
@@ -78,16 +84,6 @@ void RMT_Task(void *arg)
 
 //----------------------------------------------------------------------------
 // Constructor / Destructor
-c_OutputRmt::c_OutputRmt()
-{
-    memset((void *)&Intensity2Rmt[0], 0x00, sizeof(Intensity2Rmt));
-    memset((void *)&SendBuffer[0], 0x00, sizeof(SendBuffer));
-
-#ifdef USE_RMT_DEBUG_COUNTERS
-    memset((void *)&BitTypeCounters[0], 0x00, sizeof(BitTypeCounters));
-#endif // def USE_RMT_DEBUG_COUNTERS
-} // c_OutputRmt
-
 c_OutputRmt::~c_OutputRmt()
 {
     if (HasBeenInitialized)
@@ -103,6 +99,19 @@ c_OutputRmt::~c_OutputRmt()
         rmt_driver_uninstall((rmt_channel_t)ch);
 
         rmt_isr_ThisPtrs[(int)OutputRmtConfig.RmtChannelId] = (c_OutputRmt*)nullptr;
+    }
+
+    // Free any reusable heap buffer allocated for this instance
+    auto itBuf = g_reusableBuffers.find(this);
+    if (itBuf != g_reusableBuffers.end())
+    {
+        if (itBuf->second) free(itBuf->second);
+        g_reusableBuffers.erase(itBuf);
+    }
+    auto itCap = g_reusableCapacities.find(this);
+    if (itCap != g_reusableCapacities.end())
+    {
+        g_reusableCapacities.erase(itCap);
     }
 } // ~c_OutputRmt
 
@@ -597,48 +606,71 @@ bool c_OutputRmt::StartNewFrame()
         endItem.val = 0;
         items.push_back(endItem);
 
-        if (items.size() < 24)
+                // Copy into (or reuse) heap memory because rmt_write_items will be non-blocking.
+        size_t count = items.size();
+
+        // Look up reusable buffer for this instance
+        rmt_item32_t* heap_items = nullptr;
+        size_t reusableCapacity = 0;
+        auto itCap = g_reusableCapacities.find(this);
+        if (itCap != g_reusableCapacities.end()) reusableCapacity = itCap->second;
+
+        auto itBuf = g_reusableBuffers.find(this);
+        if (itBuf != g_reusableBuffers.end()) heap_items = itBuf->second;
+
+        // Ensure we have enough capacity
+        if (reusableCapacity < count)
         {
-            logcon(String("[RMT] WARNING: only ") + String(items.size()) +
-                " items generated -> check ISR_MoreDataToSend()");
+            // free old buffer if present
+            if (heap_items)
+            {
+                free(heap_items);
+                heap_items = nullptr;
+            }
+
+            // allocate slightly larger to reduce future grows
+            size_t newCapacity = count + 64;
+            heap_items = (rmt_item32_t*)malloc(newCapacity * sizeof(rmt_item32_t));
+            if (!heap_items)
+            {
+                logcon("[RMT] ERROR: malloc failed for reusable RMT items");
+                ok = false;
+                break;
+            }
+            // store in maps
+            g_reusableBuffers[this] = heap_items;
+            g_reusableCapacities[this] = newCapacity;
+            reusableCapacity = newCapacity;
         }
 
-        // Copy into heap memory because rmt_write_items will be non-blocking.
-        size_t count = items.size();
-        rmt_item32_t* heap_items = (rmt_item32_t*)malloc(count * sizeof(rmt_item32_t));
-        if (!heap_items)
-        {
-            logcon("[RMT] ERROR: malloc failed for RMT items");
-            ok = false;
-            break;
-        }
+        // copy the vector contents into the reusable heap buffer
         memcpy(heap_items, items.data(), count * sizeof(rmt_item32_t));
 
         // NON-BLOCKING send - allow multiple channels to run in parallel
-		esp_err_t e = rmt_write_items(
-			(rmt_channel_t)OutputRmtConfig.RmtChannelId,
-			heap_items,
-			count,
-			false
-		);
+        esp_err_t e = rmt_write_items(
+            (rmt_channel_t)OutputRmtConfig.RmtChannelId,
+            heap_items,
+            count,
+            false
+        );
 
-		if (e != ESP_OK)
-		{
-			logcon("[RMT] ERROR rmt_write_items failed");
-			free(heap_items);
-			ok = false;
-			break;
-		}
+        if (e != ESP_OK)
+        {
+            logcon("[RMT] ERROR rmt_write_items failed");
+            // Do not free heap_items here; keep for reuse
+            ok = false;
+            break;
+        }
 
-		// Wait until TX finished
-		rmt_wait_tx_done((rmt_channel_t)OutputRmtConfig.RmtChannelId, portMAX_DELAY);
+        // Wait until TX finished
+        rmt_wait_tx_done((rmt_channel_t)OutputRmtConfig.RmtChannelId, portMAX_DELAY);
 
-		if (SendFrameTaskHandle)
-		{
-			xTaskNotifyGive(SendFrameTaskHandle);
-		}
+        if (SendFrameTaskHandle)
+        {
+            xTaskNotifyGive(SendFrameTaskHandle);
+        }
 
-		free(heap_items);
+        // DO NOT free(heap_items) here — reuse it for subsequent frames.
 
     } while(false);
 
