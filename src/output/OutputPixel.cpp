@@ -685,43 +685,26 @@ bool IRAM_ATTR c_OutputPixel::ISR_GetNextIntensityToSend (uint32_t &DataToSend)
 //----------------------------------------------------------------------------
 uint32_t IRAM_ATTR c_OutputPixel::GetIntensityData()
 {
-    uint32_t response = pOutputBuffer[PixelIntensityCurrentColor +
-                                     (SentPixelsCount * NumIntensityBytesPerPixel)];
+    uint32_t response = NextPixelToSend[PixelIntensityCurrentColor];
 
     PixelIntensityCurrentColor++;
 
-    // Ende eines Pixels erreicht?
+    // Finished this pixel?
     if (PixelIntensityCurrentColor >= NumIntensityBytesPerPixel)
     {
         PixelIntensityCurrentColor = 0;
+        NextPixelToSend += NumIntensityBytesPerPixel;
         SentPixelsCount++;
 
-        // Alle Pixel gesendet?
+        // finished all pixels?
         if (SentPixelsCount >= pixel_count)
         {
-            if (AppendNullPixelCount)
-            {
-                FrameStateFuncPtr = &c_OutputPixel::PixelAppendNulls;
-            }
-            else if (FrameAppendDataSize)
-            {
-                FrameStateFuncPtr = &c_OutputPixel::FrameAppendData;
-            }
-            else
-            {
-                FrameStateFuncPtr = &c_OutputPixel::FrameDone;
-            }
-        }
-        else
-        {
-            // Nächster Pixel
-            SetStartingSendPixelState();
+            FrameStateFuncPtr = &c_OutputPixel::FrameDone;
         }
     }
 
     return response;
 }
-
 
 //----------------------------------------------------------------------------
 inline uint32_t c_OutputPixel::CalculateIntensityOffset(uint32_t ChannelId)
