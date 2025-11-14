@@ -334,6 +334,8 @@ void IRAM_ATTR c_OutputRmt::ISR_CreateIntensityData ()
     const uint32_t OneBitValue  = Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID].val;
     const uint32_t ZeroBitValue = Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID].val;
 
+	static uint32_t debugPixelCounter = 0;
+
     uint32_t IntensityValue;
     uint32_t NumAvailableBufferSlotsToFill = (NUM_RMT_SLOTS - 1) - NumUsedEntriesInSendBuffer;
 
@@ -355,7 +357,6 @@ void IRAM_ATTR c_OutputRmt::ISR_CreateIntensityData ()
         uint32_t bitmask = TxIntensityDataStartingMask;
         for (uint32_t BitCount = OutputRmtConfig.IntensityDataWidth; BitCount > 0; --BitCount)
 		
-		static uint32_t debugPixelCounter = 0;
 
 		if (debugPixelCounter < 10) {
 			logcon(String("[BITDBG] Pixel#") + String(debugPixelCounter) +
