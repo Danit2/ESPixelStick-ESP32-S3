@@ -38,26 +38,7 @@ struct TransmitWatcherParam {
     size_t count;
 };
 
-// watcher task: waits until RMT tx done, notifies send task and frees the buffer
-static void TransmitWatcherTask(void * arg)
-{
-    TransmitWatcherParam * p = (TransmitWatcherParam*)arg;
-    int ch = p->channel;
-
-    // wait until the RMT transmitter finishes for this channel (blocking in watcher task)
-    rmt_wait_tx_done((rmt_channel_t)ch, portMAX_DELAY);
-
-    // notify the sendframe task that the transmission finished (to mimic original behavior)
-    if (SendFrameTaskHandle)
-    {
-        // We're in a task context, so use the task API (not the ISR variant)
-        xTaskNotifyGive(SendFrameTaskHandle);
-    }
-
-    // free the items memory
-    free(p->items);
-    free(p);
-    vTaskDelete(NULL);
+// watcher task removed: synchronous TX wait used instead
 }
 
 //----------------------------------------------------------------------------
@@ -650,15 +631,17 @@ bool c_OutputRmt::StartNewFrame()
             break;
         }
 
-        // spawn watcher task to free heap items and notify main send task when done
-        TransmitWatcherParam * param = (TransmitWatcherParam*)malloc(sizeof(TransmitWatcherParam));
-        if (!param)
+        // Wait synchronously for TX to complete and free memory
+        rmt_wait_tx_done((rmt_channel_t)OutputRmtConfig.RmtChannelId, portMAX_DELAY);
+
+        if (SendFrameTaskHandle)
         {
-            // if we can't allocate a watcher, free memory and treat as error
-            free(heap_items);
-            logcon("[RMT] ERROR: malloc failed for TransmitWatcherParam");
-            ok = false;
-            break;
+            xTaskNotifyGive(SendFrameTaskHandle);
+        }
+
+        free(heap_items);
+        // exit frame loop
+        break;
         }
         param->channel = (int)OutputRmtConfig.RmtChannelId;
         param->items = heap_items;
