@@ -452,11 +452,28 @@ bool c_OutputRmt::StartNewFrame()
         // reserve a larger initial capacity to avoid repeated reallocations for typical strips
         // Dynamische Reservierung basierend auf Pixelanzahl
         uint32_t est_items = 0;
-        if (OutputRmtConfig.pPixelDataSource) {
-            uint32_t numPixels = OutputRmtConfig.pPixelDataSource->GetNumOutputBufferPixels();
-            uint32_t bitsPerPixel = OutputRmtConfig.IntensityDataWidth;
-            est_items = numPixels * bitsPerPixel;
+        if (OutputRmtConfig.pPixelDataSource)
+        {
+            // Erhalte Anzahl Pixel aus der Pixel-Quelle (c_OutputPixel::pixel_count)
+            // Falls das Feld in deinem Build anders heißt, passe es bitte an.
+            uint32_t numPixels = 0;
+            uint32_t bytesPerPixel = 3; // default RGB
+            numPixels = OutputRmtConfig.pPixelDataSource->pixel_count;
+            #ifdef USE_PIXEL_DEBUG_COUNTERS
+            // falls vorhanden, versuche auch NumIntensityBytesPerPixel zu nutzen
+            bytesPerPixel = OutputRmtConfig.pPixelDataSource->NumIntensityBytesPerPixel;
+            #else
+            // best effort: viele builds exposen NumIntensityBytesPerPixel als public
+            bytesPerPixel = OutputRmtConfig.pPixelDataSource->NumIntensityBytesPerPixel;
+            #endif
+
+            // IntensityDataWidth ist die Anzahl Bits pro Intensitätswert (typischerweise 8)
+            uint32_t bitsPerIntensity = OutputRmtConfig.IntensityDataWidth;
+
+            // geschätzte RMT-Items: Pixelanzahl × Bytes pro Pixel × Bits pro Byte
+            est_items = numPixels * bytesPerPixel * bitsPerIntensity;
         }
+
         // Frame-Overhead hinzuaddieren
         est_items += OutputRmtConfig.NumIdleBits
                    + OutputRmtConfig.NumFrameStartBits
