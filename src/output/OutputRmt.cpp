@@ -86,6 +86,16 @@ void RMT_Task(void *arg)
 // Constructor / Destructor
 c_OutputRmt::c_OutputRmt()
 {
+    memset((void *)&Intensity2Rmt[0], 0x00, sizeof(Intensity2Rmt));
+    memset((void *)&SendBuffer[0], 0x00, sizeof(SendBuffer));
+
+#ifdef USE_RMT_DEBUG_COUNTERS
+    memset((void *)&BitTypeCounters[0], 0x00, sizeof(BitTypeCounters));
+#endif // def USE_RMT_DEBUG_COUNTERS
+} // c_OutputRmt
+
+c_OutputRmt::~c_OutputRmt()
+{
     if (HasBeenInitialized)
     {
         String Reason = (F("Shutting down an RMT channel requires a reboot"));
