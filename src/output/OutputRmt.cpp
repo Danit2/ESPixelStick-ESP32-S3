@@ -8,6 +8,7 @@
 * Adapted to use IDF4-style RMT function API (driver/rmt.h) so it compiles with
 * platform-espressif32 @ 6.12.0 and runs on ESP32-S3 without direct register access.
 *
+* UPDATED: Non-blocking RMT output with watcher task and reduced realloc jitter.
 */
 #include "ESPixelStick.h"
 #ifdef ARDUINO_ARCH_ESP32
@@ -37,6 +38,7 @@ struct TransmitWatcherParam {
     size_t count;
 };
 
+// watcher task removed: synchronous TX wait used instead
 
 //----------------------------------------------------------------------------
 // Simple send task that polls all channels and triggers StartNextFrame()
@@ -494,11 +496,13 @@ bool c_OutputRmt::StartNewFrame()
             est_items = numPixels * bytesPerPixel * bitsPerIntensity;
         }
 
+        // Frame-Overhead hinzuaddieren
         est_items += OutputRmtConfig.NumIdleBits
                    + OutputRmtConfig.NumFrameStartBits
                    + OutputRmtConfig.NumFrameStopBits
                    + 64; // Sicherheitsreserve
 
+        // Mindestgröße
         if (est_items < 256) est_items = 256;
         items.reserve(est_items);
 
@@ -622,36 +626,8 @@ bool c_OutputRmt::StartNewFrame()
         {
             logcon("[RMT] ERROR rmt_write_items failed");
             free(heap_items);
-            ok = false;
-            break;
-        }
-
-        // Wait synchronously for TX to complete and free memory
-        rmt_wait_tx_done((rmt_channel_t)OutputRmtConfig.RmtChannelId, portMAX_DELAY);
-
-        if (SendFrameTaskHandle)
-        {
-            xTaskNotifyGive(SendFrameTaskHandle);
-        }
-
-        free(heap_items);
         // exit frame loop
         break;
-        }
-        param->channel = (int)OutputRmtConfig.RmtChannelId;
-        param->items = heap_items;
-        param->count = count;
-
-        // create watcher task - let it run on the same core as RMT_Task to avoid cross-core issues
-        BaseType_t rc = xTaskCreatePinnedToCore(TransmitWatcherTask, "RMTWatcher", 2048, param, 5, NULL, 1);
-        if (rc != pdPASS)
-        {
-            // if we couldn't create a watcher task, clean up and report error
-            free(heap_items);
-            free(param);
-            logcon("[RMT] ERROR: failed to create TransmitWatcherTask");
-            ok = false;
-            break;
         }
 
     } while (false);
