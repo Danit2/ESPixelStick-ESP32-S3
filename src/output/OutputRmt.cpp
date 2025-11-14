@@ -8,7 +8,6 @@
 * Adapted to use IDF4-style RMT function API (driver/rmt.h) so it compiles with
 * platform-espressif32 @ 6.12.0 and runs on ESP32-S3 without direct register access.
 *
-* UPDATED: Non-blocking RMT output with watcher task and reduced realloc jitter.
 */
 #include "ESPixelStick.h"
 #ifdef ARDUINO_ARCH_ESP32
@@ -38,8 +37,6 @@ struct TransmitWatcherParam {
     size_t count;
 };
 
-// watcher task removed: synchronous TX wait used instead
-}
 
 //----------------------------------------------------------------------------
 // Simple send task that polls all channels and triggers StartNextFrame()
@@ -497,13 +494,11 @@ bool c_OutputRmt::StartNewFrame()
             est_items = numPixels * bytesPerPixel * bitsPerIntensity;
         }
 
-        // Frame-Overhead hinzuaddieren
         est_items += OutputRmtConfig.NumIdleBits
                    + OutputRmtConfig.NumFrameStartBits
                    + OutputRmtConfig.NumFrameStopBits
                    + 64; // Sicherheitsreserve
 
-        // Mindestgröße
         if (est_items < 256) est_items = 256;
         items.reserve(est_items);
 
