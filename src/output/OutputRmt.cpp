@@ -454,18 +454,75 @@ bool c_OutputRmt::StartNewFrame()
         uint32_t est_items = 0;
         if (OutputRmtConfig.pPixelDataSource)
         {
-            uint32_t numPixels     = OutputRmtConfig.pPixelDataSource->GetPixelCount();
-            uint32_t bytesPerPixel = OutputRmtConfig.pPixelDataSource->GetIntensityBytesPerPixel();
-            uint32_t bitsPerByte   = OutputRmtConfig.IntensityDataWidth;
+            // Best-effort: query the pixel source config (public API) to derive
+            // pixel_count, group_size and color_order so we can estimate the
+            // number of RMT items to reserve. This avoids accessing private
+            // members of c_OutputPixel.
+            uint32_t numPixels = 0;
+            uint32_t bytesPerPixel = 3; // default RGB
 
-            est_items = numPixels * bytesPerPixel * bitsPerByte;
+            // Use the public GetConfig() to read pixel_count / group_size / color_order
+            DynamicJsonDocument cfgDoc(512);
+            JsonObject cfg = cfgDoc.to<JsonObject>();
+            OutputRmtConfig.pPixelDataSource->GetConfig(cfg);
+
+            // pixel_count can be exposed under CN_pixel_count or literal "pixel_count"
+            if (cfg.containsKey(CN_pixel_count))
+            {
+                numPixels = uint32_t(cfg[CN_pixel_count]);
+            }
+            else if (cfg.containsKey("pixel_count"))
+            {
+                numPixels = uint32_t(cfg["pixel_count"]);
+            }
+
+            // Determine bytes per pixel from group_size and color_order if available
+            uint32_t groupSize = 1;
+            if (cfg.containsKey(CN_group_size))
+            {
+                groupSize = uint32_t(cfg[CN_group_size]);
+            }
+            else if (cfg.containsKey("group_size"))
+            {
+                groupSize = uint32_t(cfg["group_size"]);
+            }
+
+            uint32_t colorOrderLen = 0;
+            if (cfg.containsKey(CN_color_order))
+            {
+                const char * co = cfg[CN_color_order];
+                if (co) colorOrderLen = strlen(co);
+            }
+            else if (cfg.containsKey("color_order"))
+            {
+                const char * co = cfg["color_order"];
+                if (co) colorOrderLen = strlen(co);
+            }
+
+            if (colorOrderLen == 0)
+            {
+                // fallback: assume RGB (3) unless we can detect 'w'
+                bytesPerPixel = 3 * groupSize;
+            }
+            else
+            {
+                bytesPerPixel = colorOrderLen * groupSize;
+            }
+
+            // IntensityDataWidth is the number of bits per intensity value (typically 8)
+            uint32_t bitsPerIntensity = OutputRmtConfig.IntensityDataWidth;
+
+            // estimated RMT items: Pixel count × Bytes per pixel × Bits per byte
+            est_items = numPixels * bytesPerPixel * bitsPerIntensity;
         }
 
+        // Frame-Overhead hinzuaddieren
         est_items += OutputRmtConfig.NumIdleBits
                    + OutputRmtConfig.NumFrameStartBits
                    + OutputRmtConfig.NumFrameStopBits
-                   + 64;
+                   + 64; // Sicherheitsreserve
 
+        // Mindestgröße
         if (est_items < 256) est_items = 256;
         items.reserve(est_items);
 
