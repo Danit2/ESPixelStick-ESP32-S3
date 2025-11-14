@@ -685,45 +685,43 @@ bool IRAM_ATTR c_OutputPixel::ISR_GetNextIntensityToSend (uint32_t &DataToSend)
 //----------------------------------------------------------------------------
 uint32_t IRAM_ATTR c_OutputPixel::GetIntensityData()
 {
-    uint32_t response = 0;
+    uint32_t response = pOutputBuffer[PixelIntensityCurrentColor +
+                                     (SentPixelsCount * NumIntensityBytesPerPixel)];
 
-    response = pOutputBuffer[PixelIntensityCurrentIndex];
+    PixelIntensityCurrentColor++;
 
-    ++PixelIntensityCurrentIndex;
-    if (PixelIntensityCurrentIndex >= OutputBufferSize)
+    // Ende eines Pixels erreicht?
+    if (PixelIntensityCurrentColor >= NumIntensityBytesPerPixel)
     {
-        // response = 0xaa;
-        if (AppendNullPixelCount)
-        {
-            PixelPrependDataCurrentIndex = 0;
-            PixelIntensityCurrentIndex = 0;
-            AppendNullPixelCurrentCount = 0;
-            PixelIntensityCurrentColor = 0;
+        PixelIntensityCurrentColor = 0;
+        SentPixelsCount++;
 
-            FrameStateFuncPtr = &c_OutputPixel::PixelAppendNulls;
-        }
-        else if (FrameAppendDataSize)
+        // Alle Pixel gesendet?
+        if (SentPixelsCount >= pixel_count)
         {
-            FrameStateFuncPtr = &c_OutputPixel::FrameAppendData;
+            if (AppendNullPixelCount)
+            {
+                FrameStateFuncPtr = &c_OutputPixel::PixelAppendNulls;
+            }
+            else if (FrameAppendDataSize)
+            {
+                FrameStateFuncPtr = &c_OutputPixel::FrameAppendData;
+            }
+            else
+            {
+                FrameStateFuncPtr = &c_OutputPixel::FrameDone;
+            }
         }
         else
         {
-#ifdef USE_PIXEL_DEBUG_COUNTERS
-            IntensityBytesSentLastFrame = IntensityBytesSent;
-#endif // def USE_PIXEL_DEBUG_COUNTERS
-
-            FrameStateFuncPtr = &c_OutputPixel::FrameDone;
+            // Nächster Pixel
+            SetStartingSendPixelState();
         }
-    }
-    // are we at the end of a pixel and are we prepending pixel data?
-    else if(++PixelIntensityCurrentColor >= NumIntensityBytesPerPixel)
-    {
-        PixelIntensityCurrentColor = 0;
-        SetStartingSendPixelState();
     }
 
     return response;
 }
+
 
 //----------------------------------------------------------------------------
 inline uint32_t c_OutputPixel::CalculateIntensityOffset(uint32_t ChannelId)
