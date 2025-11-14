@@ -7,6 +7,132 @@ jobs:
     strategy:
       matrix:
         include:
+          # ESPixelStick V3
+          - target: "espsv3"
+            chip: "esp8266"
+          # Wemos D1 Mini ESP8266
+          - target: "d1_mini"
+            chip: "esp8266"
+          # Wemos D1 Mini PRO ESP8266
+          - target: "d1_mini_pro"
+            chip: "esp8266"
+          # Wemos D1 Mini ESP8266 Plus LoLinSD Card
+          - target: "d1_mini_lolinsd"
+            chip: "esp8266"
+          # ESP01S
+          - target: "esp01s"
+            chip: "esp8266"
+          # Wemos D1 Mini ESP32
+          - target: "d1_mini32"
+            chip: "esp32"
+          # Wemos D1 Mini ESP32
+          - target: "d1_mini32_eth"
+            chip: "esp32"
+          # Lolin D32 Pro
+          - target: "d32_pro"
+            chip: "esp32"
+          # ESP32 Bong69
+          - target: "esp32_bong69"
+            chip: "esp32"
+          # ESP32 CAM
+          - target: "esp32_cam"
+            chip: "esp32"
+          # Lolin D32 Pro eth
+          - target: "d32_pro_eth"
+            chip: "esp32"
+          # TTGO T8
+          - target: "esp32_ttgo_t8"
+            chip: "esp32"
+          # WT 32 Ethernet Board
+          - target: "esp32_wt32eth01"
+            chip: "esp32"
+          # QuinLed QUAD Dig OCTA
+          - target: "esp32_quinled_dig_octa"
+            chip: "esp32"
+          # QuinLed QUAD
+          - target: "esp32_quinled_quad"
+            chip: "esp32"
+          # QuinLed QUAD_P5
+          - target: "esp32_quinled_quad_p5"
+            chip: "esp32"
+          # QuinLed QUAD AE+
+          - target: "esp32_quinled_quad_ae_plus"
+            chip: "esp32"
+          # QuinLed QUAD AE+ 8
+          - target: "esp32_quinled_quad_ae_plus_8"
+            chip: "esp32"
+          # QuinLed QUAD Eth
+          - target: "esp32_quinled_quad_eth"
+            chip: "esp32"
+          # QuinLed QUAD Eth 5 Port
+          - target: "esp32_quinled_quad_eth_p5"
+            chip: "esp32"
+          # QuinLed UNO
+          - target: "esp32_quinled_uno"
+            chip: "esp32"
+          # QuinLed UNO AE +
+          - target: "esp32_quinled_uno_ae_plus"
+            chip: "esp32"
+          # QuinLed UNO Eth
+          - target: "esp32_quinled_uno_eth"
+            chip: "esp32"
+          # QuinLed UNO Eth
+          - target: "esp32_quinled_uno_eth_espsv3"
+            chip: "esp32"
+          # Wasatch
+          - target: "esp32_wasatch"
+            chip: "esp32"
+          # mh et esp32 mini kit
+          - target: "d1_mini_mhetesp32minikit"
+            chip: "esp32"
+          # Olimex ESP32 Gateway
+          - target: "olimex_esp32_gw"
+            chip: "esp32"
+          # Twilight Lord
+          - target: "d1_mini_twilightlord"
+            chip: "esp32"
+          # Twilight Lord ETH
+          - target: "d1_mini_twilightlord_eth"
+            chip: "esp32"
+          # DEVKITC
+          - target: "esp32_devkitc"
+            chip: "esp32"
+          # M5Stack Atom
+          - target: "m5stack_atom"
+            chip: "esp32"
+          #
+          - target: "esp3deuxquatro_dmx"
+            chip: "esp32"
+          #
+          - target: "esp32_quinled_uno_espsv3"
+            chip: "esp32"
+          #
+          - target: "esp32_tetra2go"
+            chip: "esp32"
+          #
+          - target: "esp32_octa2go"
+            chip: "esp32"
+          #
+          - target: "esp32_solo2go"
+            chip: "esp32"
+          # KR Lights
+          - target: "esp32_kr_lights_msm"
+            chip: "esp32"
+          #
+          - target: "esp32_ka"
+            chip: "esp32"
+          #
+          - target: "esp32_ka_4"
+            chip: "esp32"
+          #
+          - target: "esp32_breakdancev2"
+            chip: "esp32"
+          #
+          - target: "esp32_s"
+            chip: "esp32"
+          # WT 32 Foo Board
+          - target: "esp32_foo"
+            chip: "esp32"
           # Seeed Studio XIAO ESP32-S3
           - target: "seeed_xiao_esp32s3"
             chip: "esp32s3"

@@ -859,18 +859,62 @@ void c_OutputUart::PauseOutput(bool PauseOutput)
 //-----------------------------------------------------------------------------
 bool c_OutputUart::RegisterUartIsrHandler()
 {
-    bool ret = false;
+#if defined(ARDUINO_ARCH_ESP8266)
 
-    // ESP32-S3 verwendet ETS_UART0_INUM statt ETS_UARTx_INTR_SOURCE
-    const int intr_source = ETS_UART0_INUM;
+    ETS_UART_INTR_DISABLE();
+    ETS_UART_INTR_ATTACH(uart_intr_handler, this);
+    ETS_UART_INTR_ENABLE();
+    return true;
 
-    ret = (ESP_OK == esp_intr_alloc(intr_source,
-                                    ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_SHARED,
-                                    uart_intr_handler,   // existierender Handler
-                                    this,
-                                    &IsrHandle));        // Handle deiner Klasse
-    return ret;
+#elif defined(ARDUINO_ARCH_ESP32)
 
+    int intr_source = 0;
+
+    switch (OutputUartConfig.UartId)
+    {
+        case UART_NUM_0:
+        #ifdef ETS_UART0_INTR_SOURCE
+            intr_source = ETS_UART0_INTR_SOURCE;
+        #else
+            intr_source = ETS_UART0_INUM;
+        #endif
+            break;
+
+        case UART_NUM_1:
+        #ifdef ETS_UART1_INTR_SOURCE
+            intr_source = ETS_UART1_INTR_SOURCE;
+        #else
+            intr_source = ETS_UART1_INUM;
+        #endif
+            break;
+
+#if UART_NUM_MAX > 2
+        case UART_NUM_2:
+        #ifdef ETS_UART2_INTR_SOURCE
+            intr_source = ETS_UART2_INTR_SOURCE;
+        #else
+            intr_source = ETS_UART1_INUM;
+        #endif
+            break;
+#endif
+
+        default:
+            return false;
+    }
+
+    esp_err_t err = esp_intr_alloc(
+        intr_source,
+        ESP_INTR_FLAG_IRAM,
+        uart_intr_handler,
+        this,
+        &IsrHandle
+    );
+
+    return (err == ESP_OK);
+
+#else
+    return false;
+#endif
 } // RegisterUartIsrHandler
 
 //----------------------------------------------------------------------------

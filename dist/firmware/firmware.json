@@ -2,6 +2,1451 @@
     "release": "ESPixelStick 4.0-dev - Development Release",
     "baudrate": "115200",
     "boards": [
+		{
+            "name": "ESPixelStick V3",
+            "description": "Official hardware from Forkineye",
+            "chip": "esp8266",
+            "appbin": "esp8266/espsv3-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash"
+            },
+            "binfiles": [
+                {
+                    "name": "esp8266/espsv3-app.bin",
+                    "offset": "0x0"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "8192",
+                "size": "2072576",
+                "offset": "0x200000"
+            }
+        },
+        {
+            "name": "ESPixelStick V2 ESP01S",
+            "description": "Official hardware from Forkineye",
+            "chip": "esp8266",
+            "appbin": "esp8266/esp01s-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash"
+            },
+            "binfiles": [
+                {
+                    "name": "esp8266/esp01s-app.bin",
+                    "offset": "0x0"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "8192",
+                "size": "2072576",
+                "offset": "0x200000"
+            }
+        },
+        {
+            "name": "Wemos D1 Mini",
+            "description": "Generic Wemos D1 Mini for DIY builds",
+            "chip": "esp8266",
+            "appbin": "esp8266/d1_mini-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash"
+            },
+            "binfiles": [
+                {
+                    "name": "esp8266/d1_mini-app.bin",
+                    "offset": "0x0"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "8192",
+                "size": "2072576",
+                "offset": "0x200000"
+            }
+        },
+        {
+            "name": "D1 Mini PRO",
+            "description": "Generic D1 Mini PRO for DIY builds",
+            "chip": "esp8266",
+            "appbin": "esp8266/d1_mini_pro-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash"
+            },
+            "binfiles": [
+                {
+                    "name": "esp8266/d1_mini_pro-app.bin",
+                    "offset": "0x0"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "8192",
+                "size": "2072576",
+                "offset": "0x200000"
+            }
+        },
+        {
+            "name": "D1 Mini LoLin SD",
+            "description": "Generic D1 Mini PRO for DIY builds",
+            "chip": "esp8266",
+            "appbin": "esp8266/d1_mini_lolinsd-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash"
+            },
+            "binfiles": [
+                {
+                    "name": "esp8266/d1_mini_lolinsd-app.bin",
+                    "offset": "0x0"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "8192",
+                "size": "2072576",
+                "offset": "0x200000"
+            }
+        },
+        {
+            "name": "D1 Mini Mhetesp32minikit",
+            "description": "D1 Mini Mhetesp32minikit module with PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/d1_mini_mhetesp32minikit-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/d1_mini_mhetesp32minikit-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/d1_mini_mhetesp32minikit-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/d1_mini_mhetesp32minikit-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "D1 Mini32 ETH",
+            "description": "D1 ESP32 module with PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/d1_mini32_eth-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/d1_mini32_eth-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/d1_mini32_eth-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/d1_mini32_eth-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "D1 Mini32",
+            "description": "D1 ESP32 module with PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/d1_mini32-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/d1_mini32-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/d1_mini32-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/d1_mini32-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "D32 PRO ETH",
+            "description": "D32 PRO ESP32 module with PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/d32_pro_eth-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/d32_pro_eth-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/d32_pro_eth-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/d32_pro_eth-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "D32 PRO",
+            "description": "D32 PRO ESP32 module with PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/d32_pro-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/d32_pro-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/d32_pro-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/d32_pro-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 CAM",
+            "description": "ESP32 CAM for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_cam-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_cam-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_cam-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_cam-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 TTGO T8",
+            "description": "ESP32 for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_ttgo_t8-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_ttgo_t8-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_ttgo_t8-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_ttgo_t8-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 BONG 69",
+            "description": "ESP32 8 port eth controller",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_bong69-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_bong69-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_bong69-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_bong69-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 WTEth 01",
+            "description": "ESP32 for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_wt32eth01-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_wt32eth01-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_wt32eth01-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_wt32eth01-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 WASATCH",
+            "description": "ESP32 for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_wasatch-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_wasatch-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_wasatch-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_wasatch-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 Foo",
+            "description": "ESP32 for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_foo-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_foo-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_foo-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_foo-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "D1 Mini32 Twilight Lord",
+            "description": "D1 ESP32 Twilight Lord module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/d1_mini_twilightlord-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/d1_mini_twilightlord-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/d1_mini_twilightlord-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/d1_mini_twilightlord-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "D1 Mini32 Twilight Lord ETH",
+            "description": "D32 Mini Twilight Lord ESP32 module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/d1_mini_twilightlord_eth-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/d1_mini_twilightlord_eth-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/d1_mini_twilightlord_eth-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/d1_mini_twilightlord_eth-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED DIG OCTA",
+            "description": "ESP32 module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_dig_octa-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_dig_octa-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_dig_octa-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_dig_octa-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED QUAD AE+",
+            "description": "ESP32 module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_quad_ae_plus-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_quad_ae_plus-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad_ae_plus-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad_ae_plus-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED QUAD AE+ 8 Pixel Port",
+            "description": "ESP32 module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_quad_ae_plus_8-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_quad_ae_plus_8-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad_ae_plus_8-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad_ae_plus_8-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED QUAD ETH",
+            "description": "ESP32 module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_quad_eth-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_quad_eth-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad_eth-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad_eth-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED QUAD ETH P5",
+            "description": "ESP32 module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_quad_eth_p5-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_quad_eth_p5-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad_eth_p5-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad_eth_p5-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED QUAD",
+            "description": "ESP32 module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_quad-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_quad-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED QUAD P5",
+            "description": "ESP32 module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_quad_p5-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_quad_p5-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad_p5-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_quad_p5-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED UNO AE+",
+            "description": "ESP32 module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_uno_ae_plus-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_uno_ae_plus-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_uno_ae_plus-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_uno_ae_plus-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED UNO ETH",
+            "description": "ESP32 module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_uno_eth-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_uno_eth-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_uno_eth-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_uno_eth-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED UNO ETH ESPS V3",
+            "description": "ESP32 module with NO PSRAM support for ESPS V3 board",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_uno_eth_espsv3-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_uno_eth_espsv3-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_uno_eth_espsv3-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_uno_eth_espsv3-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED UNO",
+            "description": "ESP32 module with NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_uno-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_uno-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_uno-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_uno-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "QUINLED UNO on ESPSV3",
+            "description": "ESP32 module with NO PSRAM support for ESPS V3 HW",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_quinled_uno_espsv3-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_quinled_uno_espsv3-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_uno_espsv3-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_quinled_uno_espsv3-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "m5stack atom",
+            "description": "ESP32 module with NO PSRAM",
+            "chip": "esp32",
+            "appbin": "esp32/m5stack_atom-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/m5stack_atom-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/m5stack_atom-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/m5stack_atom-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "Generic ESP32 4MB",
+            "description": "Generic ESP32 with 4MB flash layout for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/d1_mini32-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/d1_mini32-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/d1_mini32-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/d1_mini32-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "D1 DevkitC",
+            "description": "DevkitC ESP32 module NO PSRAM support for DIY builds",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_devkitc-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_devkitc-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp32_devkitc-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp32_devkitc-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP3DEUXQUAD_DMX",
+            "description": "Canada Pixels Coro ESP32 module NO PSRAM support",
+            "chip": "esp32",
+            "appbin": "esp32/esp3deuxquatro_dmx-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp3deuxquatro_dmx-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/esp3deuxquatro_dmx-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/esp3deuxquatro_dmx-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "Olimex ESP32 Gateway",
+            "description": "Olimex board with ESP32, Ethernet, SD slot, and GPIO headers",
+            "chip": "esp32",
+            "appbin": "esp32/olimex_esp32_gw-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/olimex_esp32_gw-bootloader.bin",
+                    "offset": "0x1000"
+                },
+                {
+                    "name": "esp32/olimex_esp32_gw-partitions.bin",
+                    "offset": "0x8000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0xe000"
+                },
+                {
+                    "name": "esp32/olimex_esp32_gw-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 Tetra2go",
+            "description": "D1 ESP32 based quad controller",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_tetra2go-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_tetra2go-bootloader.bin",
+                    "offset": "0x01000"
+                },
+                {
+                    "name": "esp32/esp32_tetra2go-partitions.bin",
+                    "offset": "0x08000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0x0e000"
+                },
+                {
+                    "name": "esp32/esp32_tetra2go-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 Octa2go",
+            "description": "D1 ESP32 based quad controller",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_octa2go-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_octa2go-bootloader.bin",
+                    "offset": "0x01000"
+                },
+                {
+                    "name": "esp32/esp32_octa2go-partitions.bin",
+                    "offset": "0x08000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0x0e000"
+                },
+                {
+                    "name": "esp32/esp32_octa2go-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 Solo2go",
+            "description": "D1 ESP32 based quad controller",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_solo2go-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "--before default_reset --after hard_reset",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_solo2go-bootloader.bin",
+                    "offset": "0x01000"
+                },
+                {
+                    "name": "esp32/esp32_solo2go-partitions.bin",
+                    "offset": "0x08000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0x0e000"
+                },
+                {
+                    "name": "esp32/esp32_solo2go-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 KR Lights MSM",
+            "description": "ESP32 based 5 port controller",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_kr_lights_msm-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_kr_lights_msm-bootloader.bin",
+                    "offset": "0x01000"
+                },
+                {
+                    "name": "esp32/esp32_kr_lights_msm-partitions.bin",
+                    "offset": "0x08000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0x0e000"
+                },
+                {
+                    "name": "esp32/esp32_kr_lights_msm-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 KA",
+            "description": "ESP32 based 4 port + Relay controller",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_ka-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_ka-bootloader.bin",
+                    "offset": "0x01000"
+                },
+                {
+                    "name": "esp32/esp32_ka-partitions.bin",
+                    "offset": "0x08000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0x0e000"
+                },
+                {
+                    "name": "esp32/esp32_ka-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32 KA 4",
+            "description": "ESP32 based 4 port + Relay controller",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_ka_4-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_ka_4-bootloader.bin",
+                    "offset": "0x01000"
+                },
+                {
+                    "name": "esp32/esp32_ka_4-partitions.bin",
+                    "offset": "0x08000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0x0e000"
+                },
+                {
+                    "name": "esp32/esp32_ka_4-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32S Break Dance V2",
+            "description": "ESP32S based 4 port controller",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_breakdancev2-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_breakdancev2-bootloader.bin",
+                    "offset": "0x01000"
+                },
+                {
+                    "name": "esp32/esp32_breakdancev2-partitions.bin",
+                    "offset": "0x08000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0x0e000"
+                },
+                {
+                    "name": "esp32/esp32_breakdancev2-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
+        {
+            "name": "ESP32S",
+            "description": "ESP32S based controller",
+            "chip": "esp32",
+            "appbin": "esp32/esp32_s-app.bin",
+            "esptool": {
+                "baudrate": "460800",
+                "options": "",
+                "flashcmd": "write_flash -z"
+            },
+            "binfiles": [
+                {
+                    "name": "esp32/esp32_s-bootloader.bin",
+                    "offset": "0x01000"
+                },
+                {
+                    "name": "esp32/esp32_s-partitions.bin",
+                    "offset": "0x08000"
+                },
+                {
+                    "name": "esp32/boot_app0.bin",
+                    "offset": "0x0e000"
+                },
+                {
+                    "name": "esp32/esp32_s-app.bin",
+                    "offset": "0x10000"
+                }
+            ],
+            "filesystem": {
+                "page": "256",
+                "block": "4096",
+                "size": "0x50000",
+                "offset": "0x3B0000"
+            }
+        },
         {
             "name": "Seeed Studio XIAO ESP32-S3",
             "description": "ESP32-S3 mini Controller",
