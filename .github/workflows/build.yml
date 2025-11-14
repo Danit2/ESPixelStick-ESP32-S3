@@ -25,26 +25,20 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           echo "${GITHUB_REF#refs/*/v}" > firmware/VERSION
-          
-      - name: Clean PlatformIO build and packages
-        run: |
-          rm -rf ~/.platformio
-          rm -rf .pio
 
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-      # - name: Cache pip
-        # uses: actions/cache@v4
-        # with:
-          # path: ~/.cache/pip
-          # key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          # restore-keys: |
-            # ${{ runner.os }}-pip-
-
-      # - name: Cache PlatformIO
-        # uses: actions/cache@v4
-        # with:
-          # path: ~/.platformio
-          # key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-${{ hashFiles('**/lockfiles') }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -58,14 +52,6 @@ jobs:
 
       # Build and move / rename firmware files
       # Make sure to update bootloader and boot_app0.bin location when the ESP32 core updates
-      
-      - name: Clean PlatformIO cache
-        run: |
-            rm -rf ~/.platformio/packages/framework-arduinoespressif32*
-            rm -rf ~/.platformio/packages/framework-arduinoespressif32-libs*
-            rm -rf ~/.platformio/platforms/espressif32
-            rm -rf .pio
-
       - name: Compile for ${{ matrix.target }}
         env:
           chip: ${{ matrix.chip }}
