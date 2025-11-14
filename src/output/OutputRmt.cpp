@@ -355,11 +355,15 @@ void IRAM_ATTR c_OutputRmt::ISR_CreateIntensityData ()
         uint32_t bitmask = TxIntensityDataStartingMask;
         for (uint32_t BitCount = OutputRmtConfig.IntensityDataWidth; BitCount > 0; --BitCount)
 		
-		if (IntensityValuesSent < 10) {
-			logcon(String("[BITDBG] LED#") + String(IntensityValuesSent) +
-				" Intensity=" + String(IntensityValue, HEX) +
+		static uint32_t debugPixelCounter = 0;
+
+		if (debugPixelCounter < 10) {
+			logcon(String("[BITDBG] Pixel#") + String(debugPixelCounter) +
+				" Intensity=0x" + String(IntensityValue, HEX) +
 				" Width=" + String(OutputRmtConfig.IntensityDataWidth));
 		}
+
+		debugPixelCounter++;
 
 		
         {
