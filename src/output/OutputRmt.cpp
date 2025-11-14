@@ -181,23 +181,13 @@ void c_OutputRmt::Begin(OutputRmtConfig_t config, c_OutputCommon * _pParent)
         {
             rmt_channel_t ch = OutputRmtConfig.RmtChannelId;
 
-            logcon(String("[RMT] Init Channel ") + String((int)OutputRmtConfig.RmtChannelId) +
-                " Pin=" + String((int)OutputRmtConfig.DataPin) +
-                " Tick=" + String(RMT_TickLengthNS, 2) + "ns" +
-                " IdleBits=" + String(OutputRmtConfig.NumIdleBits));
-
             UpdateBitXlatTable(OutputRmtConfig.CitrdsArray);
             bool ok = ValidateBitXlatTable(OutputRmtConfig.CitrdsArray);
-            logcon(String("[RMT] ValidateBitXlatTable ch ") + String((int)ch) + (ok ? " OK" : " DONE (check logs)"));
 
             #if defined(rmt_set_gpio)
                 rmt_set_gpio(ch, RMT_MODE_TX, (gpio_num_t)OutputRmtConfig.DataPin, true);
             #endif
         }
-
-        logcon(String("[RMT] Init Channel ") + String((int)config.RmtChannelId) +
-            " Pin=" + String((int)config.DataPin) +
-            " Tick=" + String(RMT_TickLengthNS, 2) + "ns");
 
         #if defined(SOC_RMT_SUPPORT_REF_TICK)
             ESP_ERROR_CHECK(rmt_set_source_clk(OutputRmtConfig.RmtChannelId, RMT_BASECLK_APB));
@@ -252,10 +242,6 @@ bool c_OutputRmt::ValidateBitXlatTable(const CitrdsArray_t * CitrdsArray)
 
             if (Intensity2Rmt[CurrentTranslation->Id].val != CurrentTranslation->Translation.val)
             {
-                logcon(String(CN_stars) + F("ERROR: incorrect bit translation detected. Chan: ") + String((int)OutputRmtConfig.RmtChannelId) +
-                    F(" Slot: ") + String(int(CurrentTranslation->Id)) +
-                    F(" Got: 0x") + String(Intensity2Rmt[CurrentTranslation->Id].val, HEX) +
-                    F(" Expected: 0x") + String(CurrentTranslation->Translation.val));
                 Response = false;
             }
 
@@ -560,12 +546,6 @@ bool c_OutputRmt::StartNewFrame()
         rmt_item32_t endItem;
         endItem.val = 0;
         items.push_back(endItem);
-
-        // Logging
-        logcon(String("[RMT] Channel ") +
-            String((int)OutputRmtConfig.RmtChannelId) +
-            " sending " + String(items.size()) +
-            " RMT items (" + String(float(items.size()) / 24.0, 1) + " pixelbits approx.)");
 
         if (items.size() < 24)
         {

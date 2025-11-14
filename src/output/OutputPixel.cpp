@@ -1,3 +1,4 @@
+
 /*
 * OutputPixel.cpp - Pixel driver code for ESPixelStick UART
 *
@@ -685,33 +686,21 @@ bool IRAM_ATTR c_OutputPixel::ISR_GetNextIntensityToSend (uint32_t &DataToSend)
 //----------------------------------------------------------------------------
 uint32_t IRAM_ATTR c_OutputPixel::GetIntensityData()
 {
-#ifdef USE_PIXEL_DEBUG_COUNTERS
-    PixelSendIntensityCounter++;
-    IntensityBytesSent++;
-#endif
+    uint32_t response = 0;
 
-    // Safeguard: ensure NumIntensityBytesPerPixel is sane
-    if (NumIntensityBytesPerPixel == 0) { return 0; }
+    response = pOutputBuffer[PixelIntensityCurrentIndex];
 
-    // Compute base index for current pixel in the output buffer
-    // SentPixelsCount == number of fully-sent pixels so far
-    uint32_t baseIndex = SentPixelsCount * uint32_t(NumIntensityBytesPerPixel);
-
-    // Safety check: avoid reading out of bounds
-    if (baseIndex + PixelIntensityCurrentIndex >= OutputBufferSize)
+    ++PixelIntensityCurrentIndex;
+    if (PixelIntensityCurrentIndex >= OutputBufferSize)
     {
-        // We are out of the configured buffer; treat as end of frame.
-        // Advance state to finish frame cleanly.
-#ifdef USE_PIXEL_DEBUG_COUNTERS
-        AbortFrameCounter++;
-#endif
-        // move to append/nulls or done
+        // response = 0xaa;
         if (AppendNullPixelCount)
         {
             PixelPrependDataCurrentIndex = 0;
             PixelIntensityCurrentIndex = 0;
             AppendNullPixelCurrentCount = 0;
             PixelIntensityCurrentColor = 0;
+
             FrameStateFuncPtr = &c_OutputPixel::PixelAppendNulls;
         }
         else if (FrameAppendDataSize)
@@ -720,55 +709,20 @@ uint32_t IRAM_ATTR c_OutputPixel::GetIntensityData()
         }
         else
         {
+#ifdef USE_PIXEL_DEBUG_COUNTERS
+            IntensityBytesSentLastFrame = IntensityBytesSent;
+#endif // def USE_PIXEL_DEBUG_COUNTERS
+
             FrameStateFuncPtr = &c_OutputPixel::FrameDone;
         }
-        return 0;
     }
-
-    // Read the requested intensity byte
-    uint32_t response = pOutputBuffer[baseIndex + PixelIntensityCurrentIndex];
-
-	logcon(String("[PIXDBG] sent=") + String(SentPixelsCount) + " idx=" + String(PixelIntensityCurrentIndex) + " base=" + String(baseIndex) + " resp=0x" + String(response, HEX));
-
-    // Advance per-pixel byte index
-    PixelIntensityCurrentIndex++;
-
-    // If we finished all bytes for this pixel, move to next pixel
-    if (PixelIntensityCurrentIndex >= NumIntensityBytesPerPixel)
+    // are we at the end of a pixel and are we prepending pixel data?
+    else if(++PixelIntensityCurrentColor >= NumIntensityBytesPerPixel)
     {
-        PixelIntensityCurrentIndex = 0;
-        SentPixelsCount++;
-
-        // If we've sent all configured pixels, transition to append/frame end
-        if (SentPixelsCount >= pixel_count)
-        {
-            // finished all pixels in frame
-            if (AppendNullPixelCount)
-            {
-                // go to append nulls state
-                PixelPrependDataCurrentIndex = 0;
-                PixelIntensityCurrentIndex = 0;
-                AppendNullPixelCurrentCount = 0;
-                PixelIntensityCurrentColor = 0;
-                FrameStateFuncPtr = &c_OutputPixel::PixelAppendNulls;
-            }
-            else if (FrameAppendDataSize)
-            {
-                FrameStateFuncPtr = &c_OutputPixel::FrameAppendData;
-            }
-            else
-            {
-                FrameStateFuncPtr = &c_OutputPixel::FrameDone;
-            }
-        }
-        else
-        {
-            // More pixels to send => start next pixel (may set special prepend behavior)
-            SetStartingSendPixelState();
-        }
+        PixelIntensityCurrentColor = 0;
+        SetStartingSendPixelState();
     }
 
-    // Return the raw intensity byte (caller will invert/apply multiplier if needed)
     return response;
 }
 
