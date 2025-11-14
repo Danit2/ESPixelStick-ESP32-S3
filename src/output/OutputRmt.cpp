@@ -614,23 +614,33 @@ bool c_OutputRmt::StartNewFrame()
         }
         memcpy(heap_items, items.data(), count * sizeof(rmt_item32_t));
 
-        // NON-BLOCKING send - allow multiple channels to run in parallel and avoid frame-level blocking
-        esp_err_t e = rmt_write_items(
-            (rmt_channel_t)OutputRmtConfig.RmtChannelId,
-            heap_items,
-            count,
-            false // non-blocking
-        );
+        // NON-BLOCKING send - allow multiple channels to run in parallel
+		esp_err_t e = rmt_write_items(
+			(rmt_channel_t)OutputRmtConfig.RmtChannelId,
+			heap_items,
+			count,
+			false
+		);
 
-        if (e != ESP_OK)
-        {
-            logcon("[RMT] ERROR rmt_write_items failed");
-            free(heap_items);
-        // exit frame loop
-        break;
-        }
+		if (e != ESP_OK)
+		{
+			logcon("[RMT] ERROR rmt_write_items failed");
+			free(heap_items);
+			ok = false;
+			break;
+		}
 
-    } while (false);
+		// Wait until TX finished
+		rmt_wait_tx_done((rmt_channel_t)OutputRmtConfig.RmtChannelId, portMAX_DELAY);
+
+		if (SendFrameTaskHandle)
+		{
+			xTaskNotifyGive(SendFrameTaskHandle);
+		}
+
+		free(heap_items);
+
+    } while(false);
 
     return ok;
 } // StartNewFrame
