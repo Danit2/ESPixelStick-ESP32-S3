@@ -454,33 +454,18 @@ bool c_OutputRmt::StartNewFrame()
         uint32_t est_items = 0;
         if (OutputRmtConfig.pPixelDataSource)
         {
-            // Erhalte Anzahl Pixel aus der Pixel-Quelle (c_OutputPixel::pixel_count)
-            // Falls das Feld in deinem Build anders heißt, passe es bitte an.
-            uint32_t numPixels = 0;
-            uint32_t bytesPerPixel = 3; // default RGB
-            numPixels = OutputRmtConfig.pPixelDataSource->pixel_count;
-            #ifdef USE_PIXEL_DEBUG_COUNTERS
-            // falls vorhanden, versuche auch NumIntensityBytesPerPixel zu nutzen
-            bytesPerPixel = OutputRmtConfig.pPixelDataSource->NumIntensityBytesPerPixel;
-            #else
-            // best effort: viele builds exposen NumIntensityBytesPerPixel als public
-            bytesPerPixel = OutputRmtConfig.pPixelDataSource->NumIntensityBytesPerPixel;
-            #endif
+            uint32_t numPixels     = OutputRmtConfig.pPixelDataSource->GetPixelCount();
+            uint32_t bytesPerPixel = OutputRmtConfig.pPixelDataSource->GetIntensityBytesPerPixel();
+            uint32_t bitsPerByte   = OutputRmtConfig.IntensityDataWidth;
 
-            // IntensityDataWidth ist die Anzahl Bits pro Intensitätswert (typischerweise 8)
-            uint32_t bitsPerIntensity = OutputRmtConfig.IntensityDataWidth;
-
-            // geschätzte RMT-Items: Pixelanzahl × Bytes pro Pixel × Bits pro Byte
-            est_items = numPixels * bytesPerPixel * bitsPerIntensity;
+            est_items = numPixels * bytesPerPixel * bitsPerByte;
         }
 
-        // Frame-Overhead hinzuaddieren
         est_items += OutputRmtConfig.NumIdleBits
                    + OutputRmtConfig.NumFrameStartBits
                    + OutputRmtConfig.NumFrameStopBits
-                   + 64; // Sicherheitsreserve
+                   + 64;
 
-        // Mindestgröße
         if (est_items < 256) est_items = 256;
         items.reserve(est_items);
 
