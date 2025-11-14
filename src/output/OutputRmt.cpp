@@ -424,229 +424,180 @@ bool c_OutputRmt::StartNewFrame()
         if (OutputIsPaused)
             break;
 
-        // Debug start
-        #ifdef USE_RMT_DEBUG_COUNTERS
-            FrameStartCounter++;
-            IntensityValuesSentLastFrame = IntensityValuesSent;
-            IntensityValuesSent = 0;
-            IntensityBitsSentLastFrame = IntensityBitsSent;
-            IntensityBitsSent = 0;
-        #endif
+#ifdef USE_RMT_DEBUG_COUNTERS
+        FrameStartCounter++;
+        IntensityValuesSentLastFrame = IntensityValuesSent;
+        IntensityValuesSent = 0;
+        IntensityBitsSentLastFrame = IntensityBitsSent;
+        IntensityBitsSent = 0;
+#endif
 
-        // Ask source to start a new frame
+        // Start frame on source
         ISR_StartNewDataFrame();
 
-        // Prepare linear container for rmt items for this frame
+        // --- Linear RMT item list ---
         std::vector<rmt_item32_t> items;
-        // reserve a larger initial capacity to avoid repeated reallocations for typical strips
-        // Dynamische Reservierung basierend auf Pixelanzahl
         uint32_t est_items = 0;
+
+        // --- Estimate size dynamically based on pixel source ---
         if (OutputRmtConfig.pPixelDataSource)
         {
-            // Best-effort: query the pixel source config (public API) to derive
-            // pixel_count, group_size and color_order so we can estimate the
-            // number of RMT items to reserve. This avoids accessing private
-            // members of c_OutputPixel.
             uint32_t numPixels = 0;
-            uint32_t bytesPerPixel = 3; // default RGB
+            uint32_t bytesPerPixel = 3;
+            uint32_t groupSize = 1;
+            uint32_t colorOrderLen = 0;
 
-            // Use the public GetConfig() to read pixel_count / group_size / color_order
-            DynamicJsonDocument cfgDoc(512);
+            // Use modern ArduinoJson API
+            JsonDocument cfgDoc;
+            cfgDoc.clear();
             JsonObject cfg = cfgDoc.to<JsonObject>();
+
             OutputRmtConfig.pPixelDataSource->GetConfig(cfg);
 
-            // pixel_count can be exposed under CN_pixel_count or literal "pixel_count"
-            if (cfg.containsKey(CN_pixel_count))
-            {
-                numPixels = uint32_t(cfg[CN_pixel_count]);
-            }
-            else if (cfg.containsKey("pixel_count"))
-            {
-                numPixels = uint32_t(cfg["pixel_count"]);
-            }
+            // pixel_count
+            if (cfg[CN_pixel_count].is<uint32_t>())
+                numPixels = cfg[CN_pixel_count].as<uint32_t>();
+            else if (cfg["pixel_count"].is<uint32_t>())
+                numPixels = cfg["pixel_count"].as<uint32_t>();
 
-            // Determine bytes per pixel from group_size and color_order if available
-            uint32_t groupSize = 1;
-            if (cfg.containsKey(CN_group_size))
-            {
-                groupSize = uint32_t(cfg[CN_group_size]);
-            }
-            else if (cfg.containsKey("group_size"))
-            {
-                groupSize = uint32_t(cfg["group_size"]);
-            }
+            // group_size
+            if (cfg[CN_group_size].is<uint32_t>())
+                groupSize = cfg[CN_group_size].as<uint32_t>();
+            else if (cfg["group_size"].is<uint32_t>())
+                groupSize = cfg["group_size"].as<uint32_t>();
 
-            uint32_t colorOrderLen = 0;
-            if (cfg.containsKey(CN_color_order))
+            // color_order
+            if (cfg[CN_color_order].is<const char*>())
             {
-                const char * co = cfg[CN_color_order];
+                const char* co = cfg[CN_color_order].as<const char*>();
                 if (co) colorOrderLen = strlen(co);
             }
-            else if (cfg.containsKey("color_order"))
+            else if (cfg["color_order"].is<const char*>())
             {
-                const char * co = cfg["color_order"];
+                const char* co = cfg["color_order"].as<const char*>();
                 if (co) colorOrderLen = strlen(co);
             }
 
+            // bytes per pixel
             if (colorOrderLen == 0)
-            {
-                // fallback: assume RGB (3) unless we can detect 'w'
                 bytesPerPixel = 3 * groupSize;
-            }
             else
-            {
                 bytesPerPixel = colorOrderLen * groupSize;
-            }
 
-            // IntensityDataWidth is the number of bits per intensity value (typically 8)
             uint32_t bitsPerIntensity = OutputRmtConfig.IntensityDataWidth;
 
-            // estimated RMT items: Pixel count × Bytes per pixel × Bits per byte
             est_items = numPixels * bytesPerPixel * bitsPerIntensity;
         }
 
-        // Frame-Overhead hinzuaddieren
+        // Add frame overhead
         est_items += OutputRmtConfig.NumIdleBits
                    + OutputRmtConfig.NumFrameStartBits
                    + OutputRmtConfig.NumFrameStopBits
-                   + 64; // Sicherheitsreserve
+                   + 64;
 
-        // Mindestgröße
         if (est_items < 256) est_items = 256;
         items.reserve(est_items);
 
-        // 1) Inter-frame gap (idle bits)
+        // --- Build frame items ---
+
+        // Idle bits
         for (uint32_t i = 0; i < OutputRmtConfig.NumIdleBits; ++i)
-        {
             items.push_back(Intensity2Rmt[RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID]);
-        }
 
-        // 2) Frame start bits
+        // Start bits
         for (uint32_t i = 0; i < OutputRmtConfig.NumFrameStartBits; ++i)
-        {
             items.push_back(Intensity2Rmt[RmtDataBitIdType_t::RMT_STARTBIT_ID]);
-        }
 
-        // 3) Pull intensity bytes from the configured source and convert to RMT items
+        // Pixel data
         bool more = ISR_MoreDataToSend();
         while (more)
         {
             uint32_t intensityByte = 0;
-            // Get next intensity (returns whether there will be more AFTER this byte)
             bool moreAfter = ISR_GetNextIntensityToSend(intensityByte);
 
-            // Convert this byte into bit items according to DataDirection and IntensityDataWidth
-            uint32_t mask;
-            if (OutputRmtConfig.DataDirection == OutputRmtConfig_t::DataDirection_t::MSB2LSB)
-            {
-                mask = 1u << (OutputRmtConfig.IntensityDataWidth - 1);
-            }
-            else
-            {
-                mask = 1u;
-            }
+            uint32_t mask = (OutputRmtConfig.DataDirection == OutputRmtConfig_t::DataDirection_t::MSB2LSB)
+                ? (1u << (OutputRmtConfig.IntensityDataWidth - 1))
+                : 1u;
 
             for (uint32_t b = 0; b < OutputRmtConfig.IntensityDataWidth; ++b)
             {
-                bool isOne;
-                if (OutputRmtConfig.DataDirection == OutputRmtConfig_t::DataDirection_t::MSB2LSB)
-                {
-                    isOne = (intensityByte & mask) != 0;
-                    mask >>= 1;
-                }
-                else
-                {
-                    isOne = (intensityByte & mask) != 0;
-                    mask <<= 1;
-                }
+                bool isOne = (intensityByte & mask) != 0;
 
                 items.push_back(isOne
                     ? Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ONE_ID]
                     : Intensity2Rmt[RmtDataBitIdType_t::RMT_DATA_BIT_ZERO_ID]);
 
-                #ifdef USE_RMT_DEBUG_COUNTERS
-                    IntensityBitsSent++;
-                #endif
+#ifdef USE_RMT_DEBUG_COUNTERS
+                IntensityBitsSent++;
+#endif
+
+                if (OutputRmtConfig.DataDirection == OutputRmtConfig_t::DataDirection_t::MSB2LSB)
+                    mask >>= 1;
+                else
+                    mask <<= 1;
             }
 
-            // optional inter-intensity bit
             if (OutputRmtConfig.SendInterIntensityBits)
-            {
                 items.push_back(Intensity2Rmt[RmtDataBitIdType_t::RMT_STOPBIT_ID]);
-            }
 
-            // book-keeping
-            #ifdef USE_RMT_DEBUG_COUNTERS
-                IntensityValuesSent++;
-            #endif
+#ifdef USE_RMT_DEBUG_COUNTERS
+            IntensityValuesSent++;
+#endif
 
-            // prepare next iteration
             more = moreAfter;
+
             if (!more)
             {
-                // If source said no more, optionally append end-of-frame marker
                 if (OutputRmtConfig.SendEndOfFrameBits)
-                {
                     items.push_back(Intensity2Rmt[RmtDataBitIdType_t::RMT_END_OF_FRAME]);
-                }
                 break;
             }
-
-            // small safety: vector will grow as needed
-        } // while more data
-
-        // 4) Frame stop bits (reset time)
-        for (uint32_t i = 0; i < OutputRmtConfig.NumFrameStopBits; ++i)
-        {
-            items.push_back(Intensity2Rmt[RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID]);
         }
 
-        // Terminator item to keep behavior similar to prior code
+        // Stop bits
+        for (uint32_t i = 0; i < OutputRmtConfig.NumFrameStopBits; ++i)
+            items.push_back(Intensity2Rmt[RmtDataBitIdType_t::RMT_INTERFRAME_GAP_ID]);
+
+        // Terminator
         rmt_item32_t endItem;
         endItem.val = 0;
         items.push_back(endItem);
 
-                // Copy into (or reuse) heap memory because rmt_write_items will be non-blocking.
+        // --- Reusable heap buffer (Performance optimization) ---
         size_t count = items.size();
 
-        // Look up reusable buffer for this instance
         rmt_item32_t* heap_items = nullptr;
         size_t reusableCapacity = 0;
-        auto itCap = g_reusableCapacities.find(this);
-        if (itCap != g_reusableCapacities.end()) reusableCapacity = itCap->second;
 
-        auto itBuf = g_reusableBuffers.find(this);
-        if (itBuf != g_reusableBuffers.end()) heap_items = itBuf->second;
+        auto itC = g_reusableCapacities.find(this);
+        if (itC != g_reusableCapacities.end()) reusableCapacity = itC->second;
 
-        // Ensure we have enough capacity
+        auto itB = g_reusableBuffers.find(this);
+        if (itB != g_reusableBuffers.end()) heap_items = itB->second;
+
         if (reusableCapacity < count)
         {
-            // free old buffer if present
             if (heap_items)
-            {
                 free(heap_items);
-                heap_items = nullptr;
-            }
 
-            // allocate slightly larger to reduce future grows
             size_t newCapacity = count + 64;
             heap_items = (rmt_item32_t*)malloc(newCapacity * sizeof(rmt_item32_t));
+
             if (!heap_items)
             {
-                logcon("[RMT] ERROR: malloc failed for reusable RMT items");
+                logcon("[RMT] ERROR: malloc failed");
                 ok = false;
                 break;
             }
-            // store in maps
+
             g_reusableBuffers[this] = heap_items;
             g_reusableCapacities[this] = newCapacity;
             reusableCapacity = newCapacity;
         }
 
-        // copy the vector contents into the reusable heap buffer
         memcpy(heap_items, items.data(), count * sizeof(rmt_item32_t));
 
-        // NON-BLOCKING send - allow multiple channels to run in parallel
+        // --- Send frame ---
         esp_err_t e = rmt_write_items(
             (rmt_channel_t)OutputRmtConfig.RmtChannelId,
             heap_items,
@@ -657,22 +608,16 @@ bool c_OutputRmt::StartNewFrame()
         if (e != ESP_OK)
         {
             logcon("[RMT] ERROR rmt_write_items failed");
-            // Do not free heap_items here; keep for reuse
             ok = false;
             break;
         }
 
-        // Wait until TX finished
         rmt_wait_tx_done((rmt_channel_t)OutputRmtConfig.RmtChannelId, portMAX_DELAY);
 
         if (SendFrameTaskHandle)
-        {
             xTaskNotifyGive(SendFrameTaskHandle);
-        }
 
-        // DO NOT free(heap_items) here — reuse it for subsequent frames.
-
-    } while(false);
+    } while (false);
 
     return ok;
 } // StartNewFrame
