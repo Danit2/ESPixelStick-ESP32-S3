@@ -84,7 +84,7 @@ void RMT_Task(void *arg)
 
 //----------------------------------------------------------------------------
 // Constructor / Destructor
-c_OutputRmt::~c_OutputRmt()
+c_OutputRmt::c_OutputRmt()
 {
     if (HasBeenInitialized)
     {
