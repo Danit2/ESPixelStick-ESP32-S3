@@ -480,12 +480,12 @@ bool c_OutputRmt::StartNewFrame()
 			if (cfg[CN_color_order].is<const char*>())
 			{
 				JsonString js = cfg[CN_color_order].as<JsonString>();
-				colorOrderLen = js.measureLength();   // sicher, keine \0-Abhängigkeit
+				colorOrderLen = js.size();
 			}
 			else if (cfg["color_order"].is<const char*>())
 			{
 				JsonString js = cfg["color_order"].as<JsonString>();
-				colorOrderLen = js.measureLength();   // wie oben
+				colorOrderLen = js.size();
 			}
 
             // bytes per pixel
