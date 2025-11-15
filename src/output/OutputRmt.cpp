@@ -477,16 +477,16 @@ bool c_OutputRmt::StartNewFrame()
                 groupSize = cfg["group_size"].as<uint32_t>();
 
             // color_order
-            if (cfg[CN_color_order].is<const char*>())
-            {
-                const char* co = cfg[CN_color_order].as<const char*>();
-                if (co) colorOrderLen = strlen(co);
-            }
-            else if (cfg["color_order"].is<const char*>())
-            {
-                const char* co = cfg["color_order"].as<const char*>();
-                if (co) colorOrderLen = strlen(co);
-            }
+			if (cfg[CN_color_order].is<const char*>())
+			{
+				JsonString js = cfg[CN_color_order].as<JsonString>();
+				colorOrderLen = js.measureLength();   // sicher, keine \0-Abhängigkeit
+			}
+			else if (cfg["color_order"].is<const char*>())
+			{
+				JsonString js = cfg["color_order"].as<JsonString>();
+				colorOrderLen = js.measureLength();   // wie oben
+			}
 
             // bytes per pixel
             if (colorOrderLen == 0)
