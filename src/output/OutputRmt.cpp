@@ -185,7 +185,6 @@ void c_OutputRmt::Begin(OutputRmtConfig_t config, c_OutputCommon * _pParent)
             if (!ValidateBitXlatTable(OutputRmtConfig.CitrdsArray))
 			{
 				logcon("[RMT] ERROR: Bit translation table is invalid");
-				ok = false;
 				break;
 			}
 
